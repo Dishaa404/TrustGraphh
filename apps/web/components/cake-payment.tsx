@@ -4,6 +4,7 @@ import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { keccak256, stringToHex } from "viem";
 import { useAccount } from "wagmi";
+import { getAuthToken } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -32,7 +33,7 @@ export function CakePayment() {
     try {
       const response = await fetch(`${API_URL}/payments/intent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken() ?? ""}` },
         body: JSON.stringify({
           payer_did: address
             ? `did:trustgraph:${keccak256(stringToHex(address.toLowerCase()))}`
@@ -57,7 +58,9 @@ export function CakePayment() {
   async function checkStatus() {
     if (!intent) return;
     try {
-      const response = await fetch(`${API_URL}/payments/${encodeURIComponent(intent.id)}`);
+      const response = await fetch(`${API_URL}/payments/${encodeURIComponent(intent.id)}`, {
+        headers: { Authorization: `Bearer ${getAuthToken() ?? ""}` },
+      });
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail ?? "Could not check payment status.");
       setStatus(body.status);

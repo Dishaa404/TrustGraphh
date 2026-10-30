@@ -1,8 +1,16 @@
+from conftest import login
+
+
 def create_person(client, wallet: str, **overrides):
-    payload = {"wallet": wallet, **overrides}
-    response = client.post("/persons", json=payload)
+    from eth_account import Account
+    account = Account.create()
+    payload = {"wallet": account.address, **overrides}
+    _, headers = login(client, "receiver", account=account)
+    response = client.post("/persons", json=payload, headers=headers)
     assert response.status_code == 201, response.text
-    return response.json()
+    person = response.json()
+    person["_account"] = account
+    return person
 
 
 def test_create_and_fetch_person(client):
@@ -14,15 +22,18 @@ def test_create_and_fetch_person(client):
 
     fetched = client.get(f"/persons/{person['did']}")
     assert fetched.status_code == 200
-    assert fetched.json()["wallet"] == "0xabc123"
+    assert fetched.json()["wallet"] == person["wallet"]
 
 
 def test_duplicate_did_is_rejected(client):
     person = create_person(client, "0xabc123")
 
+    from eth_account import Account
+    account = Account.create()
+    _, headers = login(client, "receiver", account=account)
     response = client.post(
         "/persons",
-        json={"wallet": "0xdef456", "did": person["did"]},
+        json={"wallet": account.address, "did": person["did"]}, headers=headers,
     )
 
     assert response.status_code == 409
@@ -33,9 +44,10 @@ def test_three_vouches_activate_a_person(client):
     vouchers = [create_person(client, f"0xvoucher{i}") for i in range(3)]
 
     for voucher in vouchers:
+        _, headers = login(client, "receiver", account=voucher["_account"])
         response = client.post(
             f"/persons/{target['did']}/vouch",
-            json={"voucher_did": voucher["did"]},
+            json={"voucher_did": voucher["did"]}, headers=headers,
         )
         assert response.status_code == 201, response.text
 

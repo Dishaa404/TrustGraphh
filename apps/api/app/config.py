@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
 
     api_cors_origins: str = "http://localhost:3000"
+    verified_ngo_wallets: str = ""
 
     tg_host: str | None = None
     tg_username: str | None = None
@@ -47,6 +48,14 @@ class Settings(BaseSettings):
             and self.cake_monero_wallet_rpc_user
             and self.cake_monero_wallet_rpc_password
         )
+
+    @property
+    def ngo_wallet_allowlist(self) -> set[str]:
+        return {
+            wallet.strip().lower()
+            for wallet in self.verified_ngo_wallets.split(",")
+            if wallet.strip()
+        }
 
 
 @lru_cache

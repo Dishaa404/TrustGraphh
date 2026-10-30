@@ -72,6 +72,15 @@ uvicorn app.main:app --reload
 
 Without TigerGraph credentials, graph endpoints return labelled demo responses. API state is in memory and resets when the process restarts.
 
+### Role sign-in and NGO approval
+
+The web app offers donor, receiver, and NGO wallet sign-in. A login signature is role-bound, used once,
+and produces a 12-hour bearer session. Donor/receiver roles are self-selected wallet roles. To approve
+an NGO issuer, set `VERIFIED_NGO_WALLETS` in `apps/api/.env` to a comma-separated list of approved
+wallet addresses (lowercase comparison is automatic), then restart the API. NGO wallets outside that
+list can submit an application but cannot issue or revoke credentials until approved. Applications and
+sessions are currently held in memory, so use a persistent store before a production launch.
+
 ## 5. Run the web app
 
 In another terminal, set the deployed registry address and API URL in `apps/web/.env.local`:

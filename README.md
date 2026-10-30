@@ -25,6 +25,13 @@ and creates XMR invoices through an authenticated Monero wallet RPC so a payer c
 Contract events are not yet indexed into TigerGraph. Semaphore proofs and production identity
 verification are not implemented.
 
+Wallet sign-in supports donor, receiver, and NGO roles. The backend issues short-lived bearer
+sessions after an Ethereum wallet signature; the signature is only a login proof and does not send a
+transaction. Donor and receiver roles are self-selected. NGO issuer access requires the wallet to be
+listed in the API's `VERIFIED_NGO_WALLETS` setting; other NGO wallets can submit an application and
+remain pending. API sessions and application records currently use in-memory storage and reset when
+the API restarts.
+
 ## Quickstart
 
 ### Contracts

@@ -2,6 +2,8 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from eth_account import Account
+from eth_account.messages import encode_defunct
 
 for key in [
     "TG_HOST",
@@ -27,9 +29,19 @@ def reset_store():
         store.payments.clear()
         store.nonces.clear()
         store.sessions.clear()
+        store.ngo_applications.clear()
     yield
 
 
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+def login(client: TestClient, role: str = "donor", account=None) -> tuple[object, dict[str, str]]:
+    account = account or Account.create()
+    challenge = client.post("/auth/nonce", json={"wallet": account.address, "role": role}).json()
+    signature = account.sign_message(encode_defunct(text=challenge["message"])).signature.hex()
+    response = client.post("/auth/verify", json={"wallet": account.address, "role": role, "nonce": challenge["nonce"], "signature": signature})
+    assert response.status_code == 200, response.text
+    return account, {"Authorization": f"Bearer {response.json()['token']}"}

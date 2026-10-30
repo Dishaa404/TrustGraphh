@@ -1,10 +1,11 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from eth_utils import keccak
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from app.routers.auth import get_current_session, require_roles
 from app.payments.base import PaymentProviderError
 from app.payments.factory import get_payment_provider
 from app.store import store
@@ -28,7 +29,14 @@ class WebhookPayload(BaseModel):
 
 
 @router.post("/intent", status_code=201)
-def create_intent(payload: PaymentIntentRequest) -> dict:
+def create_intent(
+    payload: PaymentIntentRequest,
+    session: dict = Depends(require_roles("donor")),
+) -> dict:
+    if payload.payer_wallet and payload.payer_wallet.lower() != session["wallet"]:
+        raise HTTPException(status_code=403, detail="Donors can only create invoices for their signed-in wallet")
+    if payload.payer_wallet is None:
+        payload.payer_wallet = session["wallet"]
     if payload.payer_wallet:
         expected_did = "did:trustgraph:0x" + keccak(text=payload.payer_wallet.lower()).hex()
         if payload.payer_did != expected_did:
@@ -55,12 +63,18 @@ def create_intent(payload: PaymentIntentRequest) -> dict:
 
 
 @router.get("/{payment_id}")
-def get_payment(payment_id: str) -> dict:
+def get_payment(payment_id: str, session: dict = Depends(get_current_session)) -> dict:
     with store.lock:
         payment = store.payments.get(payment_id)
 
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
+    if session["role"] == "donor" and payment.get("payer_wallet", "").lower() != session["wallet"]:
+        raise HTTPException(status_code=403, detail="Donors can only view their own payment invoices")
+    if session["role"] == "ngo" and session.get("approval_status") != "approved":
+        raise HTTPException(status_code=403, detail="NGO access is pending wallet allow-list approval")
+    if session["role"] not in {"donor", "ngo"}:
+        raise HTTPException(status_code=403, detail="Receivers cannot access donor payment invoices")
 
     provider = get_payment_provider(payment["provider"])
     try:

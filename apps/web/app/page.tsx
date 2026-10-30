@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { ConnectButton } from "@/components/connect-button";
 import { CakePayment } from "@/components/cake-payment";
 import { RegistryActions } from "@/components/registry-actions";
+import { RoleAuth } from "@/components/role-auth";
 
 type Health = {
   status: string;
@@ -133,6 +134,7 @@ export default function Home() {
     const controller = new AbortController();
 
     async function load() {
+      if (!API_URL) return;
       try {
         const sampleDid = "did:trustgraph:person-001";
         const [healthResponse, ringsResponse, trustResponse] = await Promise.all([
@@ -316,6 +318,8 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        <RoleAuth />
 
         <section id="register" className="mt-14 scroll-mt-8">
           <div className="mb-4">

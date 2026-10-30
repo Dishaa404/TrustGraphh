@@ -2,9 +2,10 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from time import time_ns
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.routers.auth import require_roles
 from app.store import store
 
 router = APIRouter(prefix="/credentials", tags=["credentials"])
@@ -24,7 +25,9 @@ class RevokeRequest(BaseModel):
 
 
 @router.post("", status_code=201)
-def issue(payload: CredentialCreate) -> dict:
+def issue(payload: CredentialCreate, session: dict = Depends(require_roles("ngo"))) -> dict:
+    if payload.issuer.lower() != session["wallet"]:
+        raise HTTPException(status_code=403, detail="NGOs can only issue credentials from their signed-in wallet")
     credential_id = "cred:" + sha256(
         f"{payload.subject_did}:{payload.content_hash}:{payload.issuer}:{time_ns()}".encode()
     ).hexdigest()[:32]
@@ -53,7 +56,11 @@ def get_credential(credential_id: str) -> dict:
 
 
 @router.post("/{credential_id}/revoke")
-def revoke(credential_id: str, payload: RevokeRequest) -> dict:
+def revoke(
+    credential_id: str,
+    payload: RevokeRequest,
+    session: dict = Depends(require_roles("ngo")),
+) -> dict:
     with store.lock:
         credential = store.credentials.get(credential_id)
         if not credential:

@@ -1,21 +1,28 @@
-def issue_credential(client):
+def issue_credential(client, monkeypatch):
+    from eth_account import Account
+    from app.config import Settings
+    from app.routers import auth
+    from conftest import login
+    account = Account.create()
+    monkeypatch.setattr(auth, "get_settings", lambda: Settings(verified_ngo_wallets=account.address))
+    _, headers = login(client, "ngo", account=account)
     response = client.post(
         "/credentials",
         json={
             "subject_did": "did:trustgraph:alice",
-            "issuer": "0xissuer",
+            "issuer": account.address,
             "credential_type": "kyc",
             "content_hash": "0xcontent",
             "cid": "ipfs://bafy-test",
             "expires_at": "2028-01-01T00:00:00Z",
-        },
+        }, headers=headers,
     )
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def test_issue_and_fetch_credential(client):
-    credential = issue_credential(client)
+def test_issue_and_fetch_credential(client, monkeypatch):
+    credential = issue_credential(client, monkeypatch)
 
     assert credential["status"] == "valid"
     assert credential["id"].startswith("cred:")
@@ -25,12 +32,13 @@ def test_issue_and_fetch_credential(client):
     assert fetched.json()["cid"] == "ipfs://bafy-test"
 
 
-def test_revoke_credential(client):
-    credential = issue_credential(client)
+def test_revoke_credential(client, monkeypatch):
+    credential = issue_credential(client, monkeypatch)
 
     revoked = client.post(
         f"/credentials/{credential['id']}/revoke",
         json={"reason": "employment ended"},
+        headers=login_approved_ngo(client, monkeypatch),
     )
 
     assert revoked.status_code == 200
@@ -40,3 +48,14 @@ def test_revoke_credential(client):
 
 def test_unknown_credential_returns_404(client):
     assert client.get("/credentials/cred:missing").status_code == 404
+
+
+def login_approved_ngo(client, monkeypatch):
+    from eth_account import Account
+    from app.config import Settings
+    from app.routers import auth
+    from conftest import login
+    account = Account.create()
+    monkeypatch.setattr(auth, "get_settings", lambda: Settings(verified_ngo_wallets=account.address))
+    _, headers = login(client, "ngo", account=account)
+    return headers

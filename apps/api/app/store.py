@@ -10,8 +10,9 @@ class MemoryStore:
     persons: dict[str, dict[str, Any]] = field(default_factory=dict)
     credentials: dict[str, dict[str, Any]] = field(default_factory=dict)
     payments: dict[str, dict[str, Any]] = field(default_factory=dict)
-    nonces: dict[str, str] = field(default_factory=dict)
-    sessions: dict[str, str] = field(default_factory=dict)
+    ngo_applications: dict[str, dict[str, Any]] = field(default_factory=dict)
+    nonces: dict[str, dict[str, str]] = field(default_factory=dict)
+    sessions: dict[str, dict[str, Any]] = field(default_factory=dict)
     lock: Lock = field(default_factory=Lock)
 
 

@@ -57,3 +57,27 @@ def test_signature_from_wrong_wallet_is_rejected(client):
     )
 
     assert response.status_code == 401
+
+
+def test_role_is_bound_to_login_challenge_and_me_endpoint(client):
+    from conftest import login
+
+    account, headers = login(client, "receiver")
+    me = client.get("/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["role"] == "receiver"
+    assert me.json()["wallet"] == account.address.lower()
+    assert client.post("/auth/logout", headers=headers).status_code == 200
+    assert client.get("/auth/me", headers=headers).status_code == 401
+
+
+def test_ngo_login_is_pending_and_can_apply(client):
+    from conftest import login
+
+    _, headers = login(client, "ngo")
+    assert client.get("/auth/me", headers=headers).json()["approval_status"] == "pending"
+    response = client.post("/auth/ngo/application", headers=headers, json={
+        "organization_name": "Example NGO", "registration_id": "REG-123", "website": "https://example.org"
+    })
+    assert response.status_code == 201
+    assert response.json()["status"] == "pending"
