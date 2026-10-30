@@ -3,7 +3,13 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 
 const privateKey = process.env.PRIVATE_KEY ?? "";
-const accounts = privateKey.length === 64 ? [privateKey] : [];
+const normalizedPrivateKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
+const accounts = /^0x[0-9a-fA-F]{64}$/.test(normalizedPrivateKey)
+  ? [normalizedPrivateKey]
+  : [];
+if (privateKey && accounts.length === 0) {
+  throw new Error("PRIVATE_KEY must be a 32-byte hex key, with or without a 0x prefix.");
+}
 
 const config: HardhatUserConfig = {
   solidity: {

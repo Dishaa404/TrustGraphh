@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 
 from fastapi import APIRouter, HTTPException
+from eth_utils import keccak
 from pydantic import BaseModel, Field
 
 from app.store import store
@@ -25,9 +26,7 @@ class VouchCreate(BaseModel):
 
 @router.post("", status_code=201)
 def create_person(payload: PersonCreate) -> dict:
-    did = payload.did or (
-        "did:trustgraph:" + sha256(payload.wallet.lower().encode()).hexdigest()[:16]
-    )
+    did = payload.did or "did:trustgraph:0x" + keccak(text=payload.wallet.lower()).hex()
     country_hash = sha256(payload.country.encode()).hexdigest() if payload.country else None
 
     with store.lock:

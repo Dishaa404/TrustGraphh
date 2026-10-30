@@ -4,7 +4,7 @@ Usage:
     python install.py
 
 Environment (or graph/.env):
-    TG_HOST, TG_USERNAME, TG_PASSWORD, TG_SECRET, TG_GRAPH
+    TG_HOST, TG_SECRET, TG_GRAPH
 """
 
 from __future__ import annotations
@@ -22,23 +22,19 @@ load_dotenv(ROOT / ".env")
 
 def connect() -> tg.TigerGraphConnection:
     host = os.environ.get("TG_HOST")
-    username = os.environ.get("TG_USERNAME")
-    password = os.environ.get("TG_PASSWORD")
     graph = os.environ.get("TG_GRAPH", "TrustGraph")
     secret = os.environ.get("TG_SECRET", "")
 
-    if not host or not username or not password:
-        sys.exit("Set TG_HOST, TG_USERNAME and TG_PASSWORD first.")
+    if not host or not secret:
+        sys.exit("Set TG_HOST and TG_SECRET first (TigerGraph Cloud graph secret).")
 
     conn = tg.TigerGraphConnection(
         host=host,
-        username=username,
-        password=password,
         graphname=graph,
+        gsqlSecret=secret,
         tgCloud=True,
     )
-    if secret:
-        conn.getToken(secret)
+    conn.getToken(secret)
     return conn
 
 

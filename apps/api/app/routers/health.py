@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.config import get_settings
+from app.tigergraph import graph_client
 
 router = APIRouter(tags=["system"])
 
@@ -14,7 +15,8 @@ def health() -> dict:
         "version": settings.version,
         "environment": settings.app_env,
         "services": {
-            "tigergraph": "configured" if settings.tigergraph_configured else "demo",
-            "payments": settings.payment_provider,
+            "tigergraph": graph_client.service_status(),
+            "payments": "connected" if settings.cake_wallet_configured else "unconfigured",
+            "payment_provider": settings.payment_provider,
         },
     }

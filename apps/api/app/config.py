@@ -38,7 +38,15 @@ class Settings(BaseSettings):
 
     @property
     def tigergraph_configured(self) -> bool:
-        return bool(self.tg_host and self.tg_username and self.tg_password)
+        return bool(self.tg_host and self.tg_secret)
+
+    @property
+    def cake_wallet_configured(self) -> bool:
+        return bool(
+            self.cake_monero_wallet_rpc_url
+            and self.cake_monero_wallet_rpc_user
+            and self.cake_monero_wallet_rpc_password
+        )
 
 
 @lru_cache

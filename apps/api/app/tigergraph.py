@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime
 from threading import Lock
 from typing import Any
 
@@ -33,13 +34,10 @@ class GraphClient:
 
                 connection = tg.TigerGraphConnection(
                     host=self.settings.tg_host,
-                    username=self.settings.tg_username,
-                    password=self.settings.tg_password,
                     graphname=self.settings.tg_graph,
-                    tgCloud=True,
+                    gsqlSecret=self.settings.tg_secret,
                 )
-                if self.settings.tg_secret:
-                    connection.getToken(self.settings.tg_secret)
+                connection.getToken(self.settings.tg_secret)
                 self._connection = connection
 
         return self._connection
@@ -128,8 +126,54 @@ class GraphClient:
             "VOUCHED",
             "Person",
             target_did,
-            {"weight": weight},
+            {
+                "weight": weight,
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            },
         )
+
+    def upsert_payment(self, payment: dict[str, Any]) -> None:
+        if not self.configured:
+            return
+        payer_did = payment["payer_did"]
+        wallet = payment.get("payer_wallet") or ""
+        connection = self._conn()
+        if connection.getVertexData("Person", payer_did):
+            connection.upsertVertex("Person", payer_did, {"wallet": wallet})
+        else:
+            connection.upsertVertex(
+                "Person",
+                payer_did,
+                {
+                    "wallet": wallet,
+                    "status": "pending",
+                    "country_hash": "",
+                    "biometric_hash": "",
+                    "trust_score": 0.0,
+                    "source": "payment",
+                },
+            )
+        connection.upsertVertex(
+            "Payment",
+            payment["id"],
+            {
+                "provider": payment["provider"],
+                "asset": payment["asset"],
+                "amount": float(payment["amount"]),
+                "tx_hash": payment.get("provider_data", {}).get("tx_hash", ""),
+                "status": payment["status"],
+            },
+        )
+        connection.upsertEdge("Person", payer_did, "PAID_BY", "Payment", payment["id"])
+
+    def service_status(self) -> str:
+        if not self.configured:
+            return "demo"
+        try:
+            self._conn().getInstalledQueries()
+        except Exception:  # noqa: BLE001
+            return "unavailable"
+        return "connected"
 
 
 graph_client = GraphClient()

@@ -19,14 +19,27 @@ import {
 import { useEffect, useState } from "react";
 
 import { ConnectButton } from "@/components/connect-button";
+import { CakePayment } from "@/components/cake-payment";
+import { RegistryActions } from "@/components/registry-actions";
 
 type Health = {
   status: string;
-  services: { tigergraph: string; payments: string };
+  services: { tigergraph: string; payments: string; payment_provider: string };
 };
 
 type Rings = {
   flagged: string[];
+  source: string;
+};
+
+type Trust = {
+  did: string;
+  trust_score: number;
+  vouch_score?: number;
+  vouch_count?: number;
+  credential_score?: number;
+  challenge_penalty?: number;
+  device_penalty?: number;
   source: string;
 };
 
@@ -48,22 +61,22 @@ const steps = [
   {
     icon: Fingerprint,
     title: "Register",
-    body: "Connect a wallet, pay the stake, and commit a biometric hash. Raw biometrics never leave the device.",
+    body: "Connect a wallet, pay the testnet stake, and write a random demo commitment hash. No biometric check runs yet.",
   },
   {
     icon: Users,
     title: "Get vouched",
-    body: "Existing humans vouch on-chain. TigerGraph scores the vouch graph and activates the member.",
+    body: "Active members vouch on-chain. The registry activates a person when their vouch threshold is met; TigerGraph calculates a separate trust score.",
   },
   {
     icon: ShieldCheck,
-    title: "Prove personhood",
-    body: "Generate a Semaphore proof that you are in the verified set without revealing which member you are.",
+    title: "Check registry status",
+    body: "The registry records pending, active, challenged, and revoked status on Base Sepolia. Semaphore proofs are planned, not implemented.",
   },
   {
     icon: CreditCard,
     title: "Pay any rail",
-    body: "Cake Wallet handles XMR, BTC and USDC. Rodo plugs into the same payment adapter interface.",
+    body: "Create an XMR invoice and scan its Monero URI in Cake Wallet. The API checks the merchant wallet RPC for payment.",
   },
 ];
 
@@ -114,26 +127,31 @@ export default function Home() {
   const [apiOnline, setApiOnline] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
   const [rings, setRings] = useState<Rings | null>(null);
+  const [trust, setTrust] = useState<Trust | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function load() {
       try {
-        const [healthResponse, ringsResponse] = await Promise.all([
+        const sampleDid = "did:trustgraph:person-001";
+        const [healthResponse, ringsResponse, trustResponse] = await Promise.all([
           fetch(`${API_URL}/health`, { signal: controller.signal }),
           fetch(`${API_URL}/graph/rings`, { signal: controller.signal }),
+          fetch(`${API_URL}/persons/${encodeURIComponent(sampleDid)}/trust`, { signal: controller.signal }),
         ]);
 
-        if (!healthResponse.ok || !ringsResponse.ok) {
+        if (!healthResponse.ok || !ringsResponse.ok || !trustResponse.ok) {
           throw new Error("API unavailable");
         }
 
         const healthData = (await healthResponse.json()) as Health;
         const ringsData = (await ringsResponse.json()) as Rings;
+        const trustData = (await trustResponse.json()) as Trust;
 
         setHealth(healthData);
         setRings(ringsData);
+        setTrust(trustData);
         setApiOnline(true);
       } catch {
         setApiOnline(false);
@@ -145,7 +163,7 @@ export default function Home() {
   }, []);
 
   const ringRows: RingRow[] =
-    rings && rings.flagged.length > 0
+    rings?.source === "tigergraph"
       ? rings.flagged.slice(0, 6).map((flag) => {
           const [did, ...signals] = flag.split("|");
           return {
@@ -157,7 +175,8 @@ export default function Home() {
       : demoRings;
 
   const graphMode = health?.services.tigergraph ?? "demo";
-  const paymentProvider = health?.services.payments ?? "cake";
+  const paymentProvider = health?.services.payment_provider ?? "cake";
+  const trustScore = Math.round(trust?.trust_score ?? 92);
 
   return (
     <main className="relative overflow-hidden">
@@ -211,13 +230,13 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 max-w-lg text-base leading-relaxed text-slate-400">
-              A stake-backed human registry on Base, a TigerGraph trust engine that explains every
-              score, and zero-knowledge proofs that answer one question: is this a unique human?
+              A stake-backed member registry on Base and a TigerGraph trust engine that scores
+              social links. Identity proofs remain a planned layer of this prototype.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a
-                href="#how"
+                href="#register"
                 className="flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300"
               >
                 Start verification
@@ -247,7 +266,7 @@ export default function Home() {
               </span>
               <span className="flex items-center gap-1.5">
                 <CreditCard className="h-3.5 w-3.5" />
-                Payments: {paymentProvider}
+                Payments: {paymentProvider} · {health?.services.payments ?? "unknown"}
               </span>
               <span className="flex items-center gap-1.5">
                 <Globe2 className="h-3.5 w-3.5" />
@@ -260,7 +279,7 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">live trust graph</p>
-                <p className="mt-1 font-mono text-xs text-slate-300">did:trustgraph:person-001</p>
+                <p className="mt-1 font-mono text-xs text-slate-300">{trust?.did ?? "did:trustgraph:person-001"}</p>
               </div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] text-emerald-200">
                 <Activity className="h-3 w-3" />
@@ -269,23 +288,23 @@ export default function Home() {
             </div>
 
             <div className="mt-6 flex items-center justify-center">
-              <Gauge score={92} />
+              <Gauge score={trustScore} />
             </div>
 
             <div className="mt-6 space-y-3">
               {[
-                ["Vouch graph", "0.82", "w-[82%]"],
-                ["Credential diversity", "0.64", "w-[64%]"],
-                ["Device overlap", "0.12", "w-[12%]"],
-                ["Challenge history", "0.00", "w-[2%]"],
-              ].map(([label, value, width]) => (
+                { label: "Vouch graph", value: (trust?.vouch_score ?? 0).toFixed(2), percent: (trust?.vouch_score ?? 0) * 100 },
+                { label: "Credential score", value: (trust?.credential_score ?? 0).toFixed(2), percent: (trust?.credential_score ?? 0) * 5 },
+                { label: "Device penalty", value: (trust?.device_penalty ?? 0).toFixed(2), percent: (trust?.device_penalty ?? 0) * 5 },
+                { label: "Challenge penalty", value: (trust?.challenge_penalty ?? 0).toFixed(2), percent: (trust?.challenge_penalty ?? 0) * 5 },
+              ].map(({ label, value, percent }) => (
                 <div key={label}>
                   <div className="mb-1 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400">{label}</span>
                     <span className="font-mono text-slate-300">{value}</span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
-                    <div className={`h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300 ${width}`} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
                   </div>
                 </div>
               ))}
@@ -293,20 +312,32 @@ export default function Home() {
 
             <div className="mt-6 flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-[11px] text-slate-400">
               <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-300" />
-              Activated by 3 trusted vouchers. 2 valid credentials. 0 shared devices.
+              {trust ? `${trust.vouch_count ?? 0} vouches · ${trust.source} trust score` : "Connect the API to load trust evidence."}
             </div>
           </div>
         </section>
 
+        <section id="register" className="mt-14 scroll-mt-8">
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">testnet demo</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Try the on-chain registry</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+              Register a wallet with the deployed Base Sepolia contract, or vouch for a pending DID hash.
+              Registration is a testnet prototype and does not establish real-world identity.
+            </p>
+          </div>
+          <RegistryActions />
+        </section>
+
         <section className="mt-16 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Humans seeded" value="60" detail="5 trusted roots" />
+          <Stat label="Seeded demo people" value={graphMode === "connected" ? "60" : "demo"} detail="TigerGraph seed dataset" />
           <Stat
             label="Sybil rings"
-            value={rings?.flagged.length ? String(rings.flagged.length) : "2"}
-            detail="planted + detected"
+            value={rings?.source === "tigergraph" ? String(rings.flagged.length) : "demo"}
+            detail={rings?.source === "tigergraph" ? "flagged accounts" : "TigerGraph not connected"}
           />
-          <Stat label="Avg trust" value="92" detail="with evidence path" />
-          <Stat label="Registration stake" value="0.001" detail="ETH on Base Sepolia" />
+          <Stat label="Sample trust score" value={String(trustScore)} detail={trust?.source ?? "demo preview"} />
+          <Stat label="Default registration stake" value="0.001" detail="ETH on Base Sepolia" />
         </section>
 
         <section id="how" className="mt-20 scroll-mt-8">
@@ -318,8 +349,8 @@ export default function Home() {
               </h2>
             </div>
             <p className="hidden max-w-xs text-sm text-slate-500 md:block">
-              Every step writes a compact event on-chain. TigerGraph keeps the full trust context
-              queryable.
+              Registration and vouching write on-chain events. The API writes person, vouch, and
+              payment records into TigerGraph for the live graph views.
             </p>
           </div>
 
@@ -350,34 +381,30 @@ export default function Home() {
             </div>
 
             <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
-              <div className="grid grid-cols-[1fr_auto_auto] bg-slate-900/70 px-4 py-2 text-[10px] uppercase tracking-wide text-slate-500">
+              <div className="grid grid-cols-[1fr_auto] bg-slate-900/70 px-4 py-2 text-[10px] uppercase tracking-wide text-slate-500">
                 <span>signal</span>
-                <span>weight</span>
-                <span>contribution</span>
+                <span>value</span>
               </div>
               {[
-                ["Vouches from trusted humans", "40%", "+32.8"],
-                ["Valid credentials", "25%", "+16.0"],
-                ["Account age", "10%", "+10.0"],
-                ["Challenge history", "15%", "-0.0"],
-                ["Device overlap penalty", "10%", "-1.2"],
-              ].map(([signal, weight, value]) => (
+                ["Vouch score", (trust?.vouch_score ?? 0).toFixed(2)],
+                ["Vouches", String(trust?.vouch_count ?? 0)],
+                ["Credential contribution", (trust?.credential_score ?? 0).toFixed(2)],
+                ["Challenge penalty", (trust?.challenge_penalty ?? 0).toFixed(2)],
+                ["Device penalty", (trust?.device_penalty ?? 0).toFixed(2)],
+              ].map(([signal, value]) => (
                 <div
                   key={signal}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-slate-800/80 px-4 py-2.5 text-xs"
+                  className="grid grid-cols-[1fr_auto] items-center gap-4 border-t border-slate-800/80 px-4 py-2.5 text-xs"
                 >
                   <span className="text-slate-300">{signal}</span>
-                  <span className="font-mono text-slate-500">{weight}</span>
-                  <span className={value.startsWith("-") ? "font-mono text-rose-300" : "font-mono text-emerald-300"}>
-                    {value}
-                  </span>
+                  <span className="font-mono text-emerald-300">{value}</span>
                 </div>
               ))}
             </div>
 
             <p className="mt-4 text-xs leading-relaxed text-slate-500">
-              GSQL returns the contributing paths, not just a number. Verifiers can audit why an
-              account is trusted before accepting a proof.
+              The score and signal values come from the API response. Full evidence paths are
+              available from the TigerGraph explanation query when the graph is connected.
             </p>
           </div>
 
@@ -464,83 +491,26 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="payments" className="mt-20 grid gap-3 lg:grid-cols-[1fr_1fr]">
+        <section id="payments" className="mt-20 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+          <CakePayment />
           <div className="panel rounded-3xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">payments</p>
-                <h2 className="mt-2 text-xl font-semibold text-white">One adapter, two rails</h2>
-              </div>
-              <CreditCard className="h-5 w-5 text-slate-600" />
+            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">payment flow</p>
+            <h2 className="mt-2 text-xl font-semibold text-white">Cake Wallet to TigerGraph</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-400">
+              Cake Wallet scans the Monero URI. The merchant wallet RPC creates an invoice-specific
+              subaddress and checks incoming transfers. The API can then record the payment event in
+              TigerGraph for graph analysis.
+            </p>
+            <div className="mt-5 space-y-2 font-mono text-[11px] text-slate-500">
+              <p>POST /payments/intent → create_address + make_uri</p>
+              <p>GET /payments/:id → get_transfers</p>
+              <p>Person -[PAID_BY]- Payment</p>
             </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-emerald-400/25 bg-emerald-400/5 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">Cake Wallet</span>
-                  <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] text-emerald-300">
-                    active
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                  Monero subaddresses for privacy, plus BTC and USDC on Base.
-                </p>
-                <div className="mt-3 flex gap-1.5">
-                  {["XMR", "BTC", "USDC"].map((asset) => (
-                    <span
-                      key={asset}
-                      className="rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 font-mono text-[10px] text-slate-300"
-                    >
-                      {asset}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">Rodo</span>
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
-                    adapter ready
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                  Same intent API, same webhook. Drop in credentials to switch rails.
-                </p>
-                <div className="mt-3 font-mono text-[10px] text-slate-500">
-                  POST /payments/intent
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel rounded-3xl p-6">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">payment intent</p>
-            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-300">pay_7f3a...91c2</span>
-                <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] text-amber-300">
-                  pending
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <p className="text-slate-500">asset</p>
-                  <p className="mt-1 font-mono text-slate-200">XMR</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">amount</p>
-                  <p className="mt-1 font-mono text-slate-200">0.042</p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-lg bg-slate-900/80 px-3 py-2 font-mono text-[10px] text-slate-400">
-                8A1b...9F4c
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
-                <Activity className="h-3.5 w-3.5 text-emerald-400" />
-                confirms in 1 network confirmation
-              </div>
-            </div>
+            <p className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-[11px] leading-relaxed text-amber-100/80">
+              Use a dedicated test wallet and Monero test/stagenet configuration for demos. The
+              wallet-RPC service controls the receiving wallet; never expose it publicly or use a
+              main wallet seed.
+            </p>
           </div>
         </section>
 

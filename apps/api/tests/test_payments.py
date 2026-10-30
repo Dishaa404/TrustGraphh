@@ -12,25 +12,32 @@ def create_intent(client, asset="XMR", provider="cake"):
     return response.json()
 
 
-def test_cake_intent_for_monero(client):
-    intent = create_intent(client)
-
-    assert intent["provider"] == "cake"
-    assert intent["asset"] == "XMR"
-    assert intent["status"] == "pending"
-    assert intent["address"].startswith("8")
-    assert intent["uri"].startswith("trustgraph://pay/")
+def test_cake_without_wallet_rpc_does_not_create_fake_invoice(client):
+    response = client.post(
+        "/payments/intent",
+        json={"payer_did": "did:trustgraph:alice", "amount": 1, "asset": "XMR", "provider": "cake"},
+    )
+    assert response.status_code == 503
 
 
-def test_rodo_sandbox_intent_for_usdc(client):
-    intent = create_intent(client, asset="USDC", provider="rodo")
+def test_unconfigured_rodo_does_not_create_fake_invoice(client):
+    response = client.post(
+        "/payments/intent",
+        json={"payer_did": "did:trustgraph:alice", "amount": 1, "asset": "USDC", "provider": "rodo"},
+    )
+    assert response.status_code == 503
 
-    assert intent["provider"] == "rodo"
-    assert intent["address"].startswith("0x")
 
+def test_webhook_confirms_payment(client, monkeypatch):
+    from app.config import Settings
+    from app.routers import payments
+    from app.store import store
 
-def test_webhook_confirms_payment(client):
-    intent = create_intent(client)
+    intent = {"id": "pay_test", "provider": "rodo", "status": "pending", "provider_data": {}}
+    with store.lock:
+        store.payments[intent["id"]] = intent
+
+    monkeypatch.setattr(payments, "get_settings", lambda: Settings(rodo_webhook_secret="test-secret"))
 
     response = client.post(
         "/payments/webhook",
@@ -39,6 +46,7 @@ def test_webhook_confirms_payment(client):
             "status": "confirmed",
             "tx_hash": "0xdeadbeef",
         },
+        headers={"X-Webhook-Secret": "test-secret"},
     )
 
     assert response.status_code == 200
