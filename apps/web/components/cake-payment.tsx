@@ -6,7 +6,7 @@ import { keccak256, stringToHex } from "viem";
 import { useAccount } from "wagmi";
 import { AuthSession, getAuthToken, getDemoSession } from "@/lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 
 type PaymentIntent = {
   id: string;
@@ -120,9 +120,9 @@ export function CakePayment() {
           </label>
           <button
             className="rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold text-emerald-950 disabled:opacity-50"
-            disabled={loading || !address}
+            disabled={loading || !address || !API_URL}
           >
-            {loading ? "Requesting address…" : "Create Cake Wallet invoice"}
+            {loading ? "Requesting address…" : !API_URL ? "API unavailable" : "Create Cake Wallet invoice"}
           </button>
           {!address && <p className="w-full text-xs text-amber-200">Connect your wallet to link the payment to its graph identity.</p>}
         </form>

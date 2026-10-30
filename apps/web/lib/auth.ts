@@ -7,7 +7,7 @@ export type AuthSession = {
   demo?: boolean;
 };
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 const TOKEN_KEY = "trustgraph.session";
 const DEMO_SESSION_KEY = "trustgraph.demo-session";
 
