@@ -1,0 +1,66 @@
+from datetime import datetime, timezone
+from hashlib import sha256
+from time import time_ns
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.store import store
+
+router = APIRouter(prefix="/credentials", tags=["credentials"])
+
+
+class CredentialCreate(BaseModel):
+    subject_did: str
+    issuer: str
+    credential_type: str
+    content_hash: str
+    cid: str
+    expires_at: str | None = None
+
+
+class RevokeRequest(BaseModel):
+    reason: str = ""
+
+
+@router.post("", status_code=201)
+def issue(payload: CredentialCreate) -> dict:
+    credential_id = "cred:" + sha256(
+        f"{payload.subject_did}:{payload.content_hash}:{payload.issuer}:{time_ns()}".encode()
+    ).hexdigest()[:32]
+
+    credential = {
+        "id": credential_id,
+        "status": "valid",
+        "issued_at": datetime.now(timezone.utc).isoformat(),
+        **payload.model_dump(),
+    }
+
+    with store.lock:
+        store.credentials[credential_id] = credential
+
+    return credential
+
+
+@router.get("/{credential_id}")
+def get_credential(credential_id: str) -> dict:
+    with store.lock:
+        credential = store.credentials.get(credential_id)
+
+    if not credential:
+        raise HTTPException(status_code=404, detail="Credential not found")
+    return credential
+
+
+@router.post("/{credential_id}/revoke")
+def revoke(credential_id: str, payload: RevokeRequest) -> dict:
+    with store.lock:
+        credential = store.credentials.get(credential_id)
+        if not credential:
+            raise HTTPException(status_code=404, detail="Credential not found")
+
+        credential["status"] = "revoked"
+        credential["revocation_reason"] = payload.reason
+        credential["revoked_at"] = datetime.now(timezone.utc).isoformat()
+
+    return credential

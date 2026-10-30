@@ -1,0 +1,33 @@
+// Returns the evidence behind a trust score: who vouched, which credentials
+// are valid, and which devices are shared with other accounts.
+
+CREATE QUERY explain_trust(STRING did) FOR GRAPH TrustGraph SYNTAX V2 {
+    SetAccum<STRING> @@vouchers;
+    SetAccum<STRING> @@credentials;
+    SetAccum<STRING> @@devices;
+    SetAccum<STRING> @@upheldChallenges;
+
+    Subject = {Person.*};
+    Subject = SELECT s FROM Subject:s WHERE s.did == did;
+
+    Vouchers = SELECT v
+        FROM Person:v -(VOUCHED:e)-> Subject:s
+        ACCUM @@vouchers += v.did + "|trust=" + to_string(v.trust_score) + "|weight=" + to_string(e.weight);
+
+    Credentials = SELECT c
+        FROM Subject:s -(HOLDS:e)-> Credential:c
+        WHERE c.status == "valid"
+        ACCUM @@credentials += c.id + "|type=" + c.credential_type;
+
+    Devices = SELECT d
+        FROM Subject:s -(USED_DEVICE:e1)- Device:d -(USED_DEVICE:e2)- Person:o
+        WHERE o != s
+        ACCUM @@devices += d.fingerprint + "|shared_with=" + o.did;
+
+    Challenges = SELECT ch
+        FROM Person:ch -(CHALLENGED:e)-> Subject:s
+        WHERE e.outcome == "upheld"
+        ACCUM @@upheldChallenges += ch.did + "|reason=" + e.reason;
+
+    PRINT @@vouchers, @@credentials, @@devices, @@upheldChallenges;
+}

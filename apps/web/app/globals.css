@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 520px at 15% -5%, rgba(16, 185, 129, 0.16), transparent 60%),
+    radial-gradient(760px 520px at 90% 8%, rgba(56, 189, 248, 0.1), transparent 55%),
+    #05070a;
+  color: #e5e7eb;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 78%);
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 12, 18, 0.82));
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.panel-hover {
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.panel-hover:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+  transform: translateY(-2px);
+}

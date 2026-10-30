@@ -1,0 +1,56 @@
+// Explainable trust score for one person.
+// Signals: voucher trust, valid credentials, upheld challenges, shared devices.
+// Replace the weighted sum with a PageRank score once the GDS PageRank query is installed.
+
+CREATE QUERY trust_score(STRING did) FOR GRAPH TrustGraph SYNTAX V2 {
+    SumAccum<DOUBLE> @@vouchScore;
+    SumAccum<INT> @@vouchCount;
+    SumAccum<DOUBLE> @@credentialScore;
+    SumAccum<INT> @@challengePenalty;
+    SumAccum<INT> @@devicePenalty;
+    SetAccum<STRING> @@sharedDevices;
+    SumAccum<DOUBLE> @@raw;
+    SumAccum<DOUBLE> @@score;
+
+    Subject = {Person.*};
+    Subject = SELECT s FROM Subject:s WHERE s.did == did;
+
+    Vouchers = SELECT v
+        FROM Person:v -(VOUCHED:e)-> Subject:s
+        ACCUM @@vouchCount += 1,
+              @@vouchScore += e.weight * ((v.trust_score + 50.0) / 100.0);
+
+    Credentials = SELECT c
+        FROM Subject:s -(HOLDS:e)-> Credential:c
+        WHERE c.status == "valid"
+        ACCUM @@credentialScore += 8.0;
+
+    Challenges = SELECT ch
+        FROM Person:ch -(CHALLENGED:e)-> Subject:s
+        WHERE e.outcome == "upheld"
+        ACCUM @@challengePenalty += 15;
+
+    Devices = SELECT d
+        FROM Subject:s -(USED_DEVICE:e1)- Device:d -(USED_DEVICE:e2)- Person:o
+        WHERE o != s
+        ACCUM @@sharedDevices += d.fingerprint;
+
+    @@devicePenalty = @@sharedDevices.size() * 5;
+    @@raw = (@@vouchScore * 4.0) + @@credentialScore - @@challengePenalty - @@devicePenalty;
+
+    IF @@raw < 0 THEN
+        @@raw = 0;
+    END;
+    IF @@raw > 100 THEN
+        @@raw = 100;
+    END;
+
+    @@score = @@raw;
+
+    PRINT @@score AS trust_score,
+          @@vouchScore AS vouch_score,
+          @@vouchCount AS vouch_count,
+          @@credentialScore AS credential_score,
+          @@challengePenalty AS challenge_penalty,
+          @@devicePenalty AS device_penalty;
+}

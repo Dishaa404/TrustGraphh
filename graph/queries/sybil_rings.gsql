@@ -1,0 +1,32 @@
+// Heuristic sybil-ring detector for the demo.
+// Flags accounts that participate in mutual vouching cycles and/or share devices
+// with unrelated accounts. For production, install the TigerGraph GDS Louvain
+// community query and use community density / external-edge ratio instead.
+
+CREATE QUERY sybil_rings(INT min_mutual = 2, INT min_devices = 2) FOR GRAPH TrustGraph SYNTAX V2 {
+    SumAccum<INT> @mutual;
+    SumAccum<INT> @sharedDevices;
+    SetAccum<STRING> @@flagged;
+
+    Start = {Person.*};
+    Start = SELECT s FROM Start:s WHERE s.status == "active";
+
+    Mutual = SELECT s
+        FROM Start:s -(VOUCHED:e1)-> Person:t -(VOUCHED:e2)-> Person:u
+        WHERE s == u
+        ACCUM s.@mutual += 1;
+
+    Shared = SELECT s
+        FROM Start:s -(USED_DEVICE:e1)- Device:d -(USED_DEVICE:e2)- Person:o
+        WHERE o != s
+        ACCUM s.@sharedDevices += 1;
+
+    Result = SELECT s
+        FROM Start:s
+        WHERE s.@mutual >= min_mutual OR s.@sharedDevices >= min_devices
+        ACCUM @@flagged += s.did
+            + "|mutual=" + to_string(s.@mutual)
+            + "|shared_devices=" + to_string(s.@sharedDevices);
+
+    PRINT @@flagged;
+}

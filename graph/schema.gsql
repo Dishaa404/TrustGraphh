@@ -1,0 +1,92 @@
+// TrustGraph schema
+// Run through install.py (or the GSQL shell) on a TigerGraph Savanna instance.
+
+CREATE VERTEX Person (
+    PRIMARY_ID did STRING,
+    wallet STRING,
+    status STRING,
+    country_hash STRING,
+    biometric_hash STRING,
+    registered_at DATETIME,
+    active_at DATETIME,
+    trust_score DOUBLE,
+    source STRING
+)
+
+CREATE VERTEX Wallet (
+    PRIMARY_ID address STRING,
+    chain STRING
+)
+
+CREATE VERTEX Credential (
+    PRIMARY_ID id STRING,
+    credential_type STRING,
+    content_hash STRING,
+    cid STRING,
+    status STRING,
+    issued_at DATETIME,
+    expires_at DATETIME
+)
+
+CREATE VERTEX Issuer (
+    PRIMARY_ID id STRING,
+    name STRING,
+    trust_tier INT
+)
+
+CREATE VERTEX Challenge (
+    PRIMARY_ID id STRING,
+    reason STRING,
+    status STRING,
+    stake DOUBLE,
+    created_at DATETIME
+)
+
+CREATE VERTEX Device (
+    PRIMARY_ID fingerprint STRING,
+    platform STRING
+)
+
+CREATE VERTEX Community (
+    PRIMARY_ID id STRING,
+    algorithm STRING,
+    label STRING
+)
+
+CREATE VERTEX Payment (
+    PRIMARY_ID id STRING,
+    provider STRING,
+    asset STRING,
+    amount DOUBLE,
+    tx_hash STRING,
+    status STRING
+)
+
+CREATE UNDIRECTED EDGE HAS_WALLET (FROM Person, TO Wallet)
+
+CREATE DIRECTED EDGE VOUCHED (
+    FROM Person,
+    TO Person,
+    weight DOUBLE,
+    created_at DATETIME
+)
+
+CREATE DIRECTED EDGE HOLDS (FROM Person, TO Credential)
+
+CREATE DIRECTED EDGE ATTESTED_BY (FROM Credential, TO Issuer)
+
+CREATE DIRECTED EDGE CHALLENGED (
+    FROM Person,
+    TO Person,
+    reason STRING,
+    outcome STRING,
+    created_at DATETIME
+)
+
+CREATE UNDIRECTED EDGE USED_DEVICE (FROM Person, TO Device)
+
+CREATE DIRECTED EDGE MEMBER_OF (FROM Person, TO Community)
+
+CREATE DIRECTED EDGE PAID_BY (FROM Person, TO Payment)
+
+CREATE GRAPH TrustGraph (*)
