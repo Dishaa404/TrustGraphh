@@ -32,6 +32,11 @@ listed in the API's `VERIFIED_NGO_WALLETS` setting; other NGO wallets can submit
 remain pending. API sessions and application records currently use in-memory storage and reset when
 the API restarts.
 
+To preview without a crypto wallet, use **Try demo Donor/Receiver/NGO** on the landing page. Demo
+sessions are browser-only and the Cake payment panel creates a simulated transaction that can be
+marked paid locally. Demo actions do not authenticate with the API, submit blockchain transactions,
+create an XMR invoice, or transfer funds.
+
 ## Quickstart
 
 ### Contracts

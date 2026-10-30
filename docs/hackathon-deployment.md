@@ -94,6 +94,8 @@ npm run dev
 
 Open `http://localhost:3000`, connect an injected wallet, switch it to Base Sepolia, and register. The page reads the registration stake from the contract and links submitted transactions to BaseScan. It also creates Cake Wallet invoices through the API and shows the returned payment QR code.
 
+For a no-wallet preview, choose **Try demo Donor**, **Try demo Receiver**, or **Try demo NGO** on the landing page. The donor demo can create a simulated payment and mark it paid. This is browser-only preview state; it does not call the API, create a Monero invoice, or submit a blockchain transaction.
+
 ## Checks
 
 Run `python -m pytest -q` in `apps/api`, `npm test` in `contracts`, and `npm run build` in `apps/web`. GitHub Actions runs these checks on pushes to `main` and pull requests. A deployment still needs a funded Base Sepolia deployer and live TigerGraph and Monero wallet-RPC credentials.

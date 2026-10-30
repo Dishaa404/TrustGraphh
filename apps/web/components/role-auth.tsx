@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useSignMessage } from "wagmi";
-import { API_URL, AuthSession, clearAuthToken, getAuthToken, saveAuthToken, UserRole } from "@/lib/auth";
+import { API_URL, AuthSession, clearAuthToken, clearDemoSession, getAuthToken, getDemoSession, saveAuthToken, saveDemoSession, UserRole } from "@/lib/auth";
 
 const roles: { id: UserRole; title: string; detail: string }[] = [
   { id: "donor", title: "Donor", detail: "Create and track Cake Wallet invoices." },
@@ -20,6 +20,12 @@ export function RoleAuth() {
   const [notice, setNotice] = useState("");
 
   const loadSession = useCallback(async () => {
+    const demoSession = getDemoSession();
+    if (demoSession) {
+      setSession(demoSession);
+      setRole(demoSession.role);
+      return;
+    }
     const token = getAuthToken();
     if (!token || !API_URL) return;
     try {
@@ -81,9 +87,30 @@ export function RoleAuth() {
   }
 
   async function logout() {
+    if (session?.demo) {
+      clearDemoSession(); setSession(null); setNotice("Demo session signed out."); return;
+    }
     const token = getAuthToken();
     if (token && API_URL) await fetch(`${API_URL}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => undefined);
-    clearAuthToken(); setSession(null); setNotice("Signed out.");
+    clearAuthToken(); clearDemoSession(); setSession(null); setNotice("Signed out.");
+  }
+
+  function enterDemo(demoRole: UserRole) {
+    const demoWallets: Record<UserRole, string> = {
+      donor: "0xd000000000000000000000000000000000000001",
+      receiver: "0x0000000000000000000000000000000000000002",
+      ngo: "0x0000000000000000000000000000000000000003",
+    };
+    const demoSession: AuthSession = {
+      authenticated: true,
+      wallet: demoWallets[demoRole],
+      role: demoRole,
+      approval_status: demoRole === "ngo" ? "pending" : "not_applicable",
+      demo: true,
+    };
+    saveDemoSession(demoSession);
+    setSession(demoSession); setRole(demoRole); setError("");
+    setNotice("Demo account active. Actions are simulated and do not use a wallet.");
   }
 
   return <section id="login" className="panel mt-10 scroll-mt-8 rounded-3xl p-6">
@@ -91,11 +118,16 @@ export function RoleAuth() {
     <h2 className="mt-2 text-2xl font-semibold text-white">Donor, receiver, and NGO sign in</h2>
     <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">Sign in with a wallet signature. Signing the login message does not submit a blockchain transaction. Donor and receiver are wallet selected roles; NGO issuer privileges require server approval.</p>
     {session ? <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
-      <div><p className="text-sm font-semibold capitalize text-white">{session.role} session · {session.approval_status}</p><p className="mt-1 font-mono text-xs text-slate-400">{session.wallet}</p></div>
+      <div><p className="text-sm font-semibold capitalize text-white">{session.demo ? "Demo " : ""}{session.role} session · {session.approval_status}</p><p className="mt-1 font-mono text-xs text-slate-400">{session.wallet}</p></div>
       <button onClick={logout} className="rounded-full border border-slate-600 px-4 py-2 text-xs text-slate-200">Sign out</button>
     </div> : <>
       <div className="mt-5 grid gap-3 md:grid-cols-3">{roles.map((item) => <button key={item.id} onClick={() => setRole(item.id)} className={`rounded-xl border p-4 text-left ${role === item.id ? "border-emerald-300/60 bg-emerald-400/10" : "border-slate-800 bg-slate-950/40"}`}><span className="text-sm font-semibold text-white">{item.title}</span><span className="mt-1 block text-xs leading-relaxed text-slate-400">{item.detail}</span></button>)}</div>
       <button disabled={!isConnected || busy || !API_URL} onClick={login} className="mt-4 rounded-full bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-emerald-950 disabled:opacity-50">{busy ? "Waiting for signature…" : !API_URL ? "API unavailable" : !isConnected ? "Connect wallet first" : `Sign in as ${role}`}</button>
+      <div className="mt-5 rounded-xl border border-sky-400/20 bg-sky-400/5 p-4">
+        <p className="text-xs font-semibold text-sky-100">Just looking around? Use a demo account</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-400">No wallet, account creation, crypto, or signature needed. Demo actions are simulated.</p>
+        <div className="mt-3 flex flex-wrap gap-2">{roles.map((item) => <button key={`demo-${item.id}`} onClick={() => enterDemo(item.id)} className="rounded-full border border-sky-300/30 px-3 py-1.5 text-xs text-sky-100">Try demo {item.title}</button>)}</div>
+      </div>
     </>}
     {session?.role === "ngo" && session.approval_status === "pending" && <form onSubmit={submitNgoApplication} className="mt-5 grid gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 md:grid-cols-3"><label className="text-xs text-slate-300">Organization name<input required minLength={2} name="organization" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><label className="text-xs text-slate-300">Registration ID<input required minLength={2} name="registration" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><label className="text-xs text-slate-300">Website (optional)<input type="url" name="website" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><button className="rounded-full border border-amber-300/30 px-4 py-2 text-xs text-amber-100 md:col-span-3 md:justify-self-start">Submit NGO application</button></form>}
     {notice && <p className="mt-3 text-xs text-emerald-200">{notice}</p>}{error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
