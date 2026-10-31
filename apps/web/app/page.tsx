@@ -17,6 +17,8 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import { keccak256, stringToHex } from "viem";
 
 import { ConnectButton } from "@/components/connect-button";
 import { CakePayment } from "@/components/cake-payment";
@@ -35,7 +37,7 @@ type Rings = {
 
 type Trust = {
   did: string;
-  trust_score: number;
+  trust_score?: number;
   vouch_score?: number;
   vouch_count?: number;
   credential_score?: number;
@@ -52,17 +54,11 @@ type RingRow = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 
-const demoRings: RingRow[] = [
-  { name: "ring-a / 5 accounts", signal: "mutual vouches + shared emulator", risk: "critical" },
-  { name: "ring-b / 5 accounts", signal: "fully connected vouch cluster", risk: "high" },
-  { name: "person-017", signal: "shared household device", risk: "medium" },
-];
-
 const steps = [
   {
     icon: Fingerprint,
     title: "Register",
-    body: "Connect a wallet, pay the testnet stake, and write a random demo commitment hash. No biometric check runs yet.",
+    body: "Connect a wallet, pay the Base Sepolia stake, and write a commitment hash to the registry.",
   },
   {
     icon: Users,
@@ -81,8 +77,8 @@ const steps = [
   },
 ];
 
-function Gauge({ score }: { score: number }) {
-  const degrees = Math.round((score / 100) * 360);
+function Gauge({ score }: { score: number | null }) {
+  const degrees = Math.round(((score ?? 0) / 100) * 360);
 
   return (
     <div className="relative h-44 w-44">
@@ -93,7 +89,7 @@ function Gauge({ score }: { score: number }) {
         }}
       />
       <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-[#080d13]">
-        <span className="text-4xl font-semibold tracking-tight text-white">{score}</span>
+        <span className="text-4xl font-semibold tracking-tight text-white">{score ?? "—"}</span>
         <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">trust score</span>
       </div>
     </div>
@@ -125,6 +121,8 @@ function RiskChip({ risk }: { risk: RingRow["risk"] }) {
 }
 
 export default function Home() {
+  const { address } = useAccount();
+  const currentDid = address ? `did:trustgraph:${keccak256(stringToHex(address.toLowerCase()))}` : null;
   const [apiOnline, setApiOnline] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
   const [rings, setRings] = useState<Rings | null>(null);
@@ -134,35 +132,38 @@ export default function Home() {
     const controller = new AbortController();
 
     async function load() {
+      setTrust(null);
       if (!API_URL) return;
       try {
-        const sampleDid = "did:trustgraph:person-001";
-        const [healthResponse, ringsResponse, trustResponse] = await Promise.all([
+        const [healthResponse, ringsResponse] = await Promise.all([
           fetch(`${API_URL}/health`, { signal: controller.signal }),
           fetch(`${API_URL}/graph/rings`, { signal: controller.signal }),
-          fetch(`${API_URL}/persons/${encodeURIComponent(sampleDid)}/trust`, { signal: controller.signal }),
         ]);
 
-        if (!healthResponse.ok || !ringsResponse.ok || !trustResponse.ok) {
+        if (!healthResponse.ok || !ringsResponse.ok) {
           throw new Error("API unavailable");
         }
 
         const healthData = (await healthResponse.json()) as Health;
         const ringsData = (await ringsResponse.json()) as Rings;
-        const trustData = (await trustResponse.json()) as Trust;
-
         setHealth(healthData);
         setRings(ringsData);
-        setTrust(trustData);
+        if (currentDid) {
+          const trustResponse = await fetch(`${API_URL}/persons/${encodeURIComponent(currentDid)}/trust`, { signal: controller.signal });
+          if (trustResponse.ok) setTrust((await trustResponse.json()) as Trust);
+        }
         setApiOnline(true);
       } catch {
         setApiOnline(false);
+        setHealth(null);
+        setRings(null);
+        setTrust(null);
       }
     }
 
     load();
     return () => controller.abort();
-  }, []);
+  }, [address, currentDid]);
 
   const ringRows: RingRow[] =
     rings?.source === "tigergraph"
@@ -174,11 +175,11 @@ export default function Home() {
             risk: "critical" as const,
           };
         })
-      : demoRings;
+      : [];
 
-  const graphMode = health?.services.tigergraph ?? "demo";
-  const paymentProvider = health?.services.payment_provider ?? "cake";
-  const trustScore = Math.round(trust?.trust_score ?? 92);
+  const graphMode = health?.services.tigergraph ?? "unavailable";
+  const paymentProvider = health?.services.payment_provider ?? "not configured";
+  const trustScore = trust?.trust_score === undefined ? null : Math.round(trust.trust_score);
 
   return (
     <main className="relative overflow-hidden">
@@ -281,7 +282,7 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">live trust graph</p>
-                <p className="mt-1 font-mono text-xs text-slate-300">{trust?.did ?? "did:trustgraph:person-001"}</p>
+                <p className="mt-1 font-mono text-xs text-slate-300">{trust?.did ?? currentDid ?? "Connect a wallet to view its trust record"}</p>
               </div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] text-emerald-200">
                 <Activity className="h-3 w-3" />
@@ -295,10 +296,10 @@ export default function Home() {
 
             <div className="mt-6 space-y-3">
               {[
-                { label: "Vouch graph", value: (trust?.vouch_score ?? 0).toFixed(2), percent: (trust?.vouch_score ?? 0) * 100 },
-                { label: "Credential score", value: (trust?.credential_score ?? 0).toFixed(2), percent: (trust?.credential_score ?? 0) * 5 },
-                { label: "Device penalty", value: (trust?.device_penalty ?? 0).toFixed(2), percent: (trust?.device_penalty ?? 0) * 5 },
-                { label: "Challenge penalty", value: (trust?.challenge_penalty ?? 0).toFixed(2), percent: (trust?.challenge_penalty ?? 0) * 5 },
+                { label: "Vouch graph", value: trust?.vouch_score?.toFixed(2) ?? "—", percent: (trust?.vouch_score ?? 0) * 100 },
+                { label: "Credential score", value: trust?.credential_score?.toFixed(2) ?? "—", percent: (trust?.credential_score ?? 0) * 5 },
+                { label: "Device penalty", value: trust?.device_penalty?.toFixed(2) ?? "—", percent: (trust?.device_penalty ?? 0) * 5 },
+                { label: "Challenge penalty", value: trust?.challenge_penalty?.toFixed(2) ?? "—", percent: (trust?.challenge_penalty ?? 0) * 5 },
               ].map(({ label, value, percent }) => (
                 <div key={label}>
                   <div className="mb-1 flex items-center justify-between text-[11px]">
@@ -314,7 +315,7 @@ export default function Home() {
 
             <div className="mt-6 flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-[11px] text-slate-400">
               <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-300" />
-              {trust ? `${trust.vouch_count ?? 0} vouches · ${trust.source} trust score` : "Connect the API to load trust evidence."}
+              {trust ? `${trust.vouch_count ?? 0} vouches · ${trust.source} trust score` : "Connect a wallet and configure the API to load trust evidence."}
             </div>
           </div>
         </section>
@@ -323,8 +324,8 @@ export default function Home() {
 
         <section id="register" className="mt-14 scroll-mt-8">
           <div className="mb-4">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">testnet demo</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Try the on-chain registry</h2>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">Base Sepolia testnet</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">On-chain registry</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
               Register a wallet with the deployed Base Sepolia contract, or vouch for a pending DID hash.
               Registration is a testnet prototype and does not establish real-world identity.
@@ -334,14 +335,14 @@ export default function Home() {
         </section>
 
         <section className="mt-16 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Seeded demo people" value={graphMode === "connected" ? "60" : "demo"} detail="TigerGraph seed dataset" />
+          <Stat label="TigerGraph" value={graphMode} detail="Live service status" />
           <Stat
-            label="Sybil rings"
-            value={rings?.source === "tigergraph" ? String(rings.flagged.length) : "demo"}
-            detail={rings?.source === "tigergraph" ? "flagged accounts" : "TigerGraph not connected"}
+            label="Flagged clusters"
+            value={rings?.source === "tigergraph" ? String(rings.flagged.length) : "—"}
+            detail={rings?.source === "tigergraph" ? "Live graph results" : "TigerGraph not connected"}
           />
-          <Stat label="Sample trust score" value={String(trustScore)} detail={trust?.source ?? "demo preview"} />
-          <Stat label="Default registration stake" value="0.001" detail="ETH on Base Sepolia" />
+          <Stat label="Wallet trust score" value={trustScore === null ? "—" : String(trustScore)} detail={trust?.source ?? "Connect a wallet"} />
+          <Stat label="Network" value="Base Sepolia" detail="Testnet registry" />
         </section>
 
         <section id="how" className="mt-20 scroll-mt-8">
@@ -349,7 +350,7 @@ export default function Home() {
             <div>
               <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">the flow</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-                Four steps from wallet to proof
+                Four steps from wallet to registry
               </h2>
             </div>
             <p className="hidden max-w-xs text-sm text-slate-500 md:block">
@@ -390,11 +391,11 @@ export default function Home() {
                 <span>value</span>
               </div>
               {[
-                ["Vouch score", (trust?.vouch_score ?? 0).toFixed(2)],
-                ["Vouches", String(trust?.vouch_count ?? 0)],
-                ["Credential contribution", (trust?.credential_score ?? 0).toFixed(2)],
-                ["Challenge penalty", (trust?.challenge_penalty ?? 0).toFixed(2)],
-                ["Device penalty", (trust?.device_penalty ?? 0).toFixed(2)],
+                ["Vouch score", trust?.vouch_score?.toFixed(2) ?? "—"],
+                ["Vouches", trust?.vouch_count === undefined ? "—" : String(trust.vouch_count)],
+                ["Credential contribution", trust?.credential_score?.toFixed(2) ?? "—"],
+                ["Challenge penalty", trust?.challenge_penalty?.toFixed(2) ?? "—"],
+                ["Device penalty", trust?.device_penalty?.toFixed(2) ?? "—"],
               ].map(([signal, value]) => (
                 <div
                   key={signal}
@@ -416,37 +417,10 @@ export default function Home() {
             <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">credential graph</p>
             <h2 className="mt-2 text-xl font-semibold text-white">Revocation propagates</h2>
 
-            <div className="mt-5 space-y-3">
-              {[
-                ["issuer:gov", "KYC credential", "valid", "emerald"],
-                ["issuer:uni", "Education credential", "valid", "emerald"],
-                ["issuer:employer", "Employment credential", "revoked", "rose"],
-              ].map(([issuer, type, status, tone]) => (
-                <div
-                  key={type}
-                  className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-3"
-                >
-                  <div>
-                    <p className="text-xs font-medium text-slate-200">{type}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-slate-500">{issuer}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${
-                      tone === "rose"
-                        ? "bg-rose-400/10 text-rose-300"
-                        : "bg-emerald-400/10 text-emerald-300"
-                    }`}
-                  >
-                    {status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-[11px] leading-relaxed text-amber-200/80">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Revoking a slashed issuer flags every downstream credential in one GSQL traversal.
-            </div>
+            <p className="mt-5 text-sm leading-relaxed text-slate-400">
+              Credentials issued by an approved organization are written to the graph with their current status.
+              Revocations update the credential record and its graph relationships.
+            </p>
           </div>
         </section>
 
@@ -455,26 +429,16 @@ export default function Home() {
             <p className="text-[10px] uppercase tracking-[0.24em] text-rose-300/80">sybil detection</p>
             <h2 className="mt-2 text-xl font-semibold text-white">Rings, not just accounts</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-400">
-              Mutual-vouch cycles, shared devices, and dense internal communities are scored
-              together. The demo plants two rings of five accounts inside sixty honest humans.
+              Mutual vouch cycles and shared-device links are evaluated from the records in TigerGraph.
+              Results appear here when the graph service is configured and has matching records.
             </p>
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                <p className="font-mono text-lg text-emerald-300">10</p>
-                <p className="text-[10px] uppercase tracking-wide text-slate-500">planted accounts</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                <p className="font-mono text-lg text-rose-300">2</p>
-                <p className="text-[10px] uppercase tracking-wide text-slate-500">rings to find</p>
-              </div>
-            </div>
           </div>
 
           <div className="panel rounded-3xl p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Flagged clusters</h2>
               <span className="font-mono text-[10px] text-slate-500">
-                source: {rings?.source ?? "demo"}
+                source: {rings?.source ?? "unavailable"}
               </span>
             </div>
 
@@ -491,6 +455,7 @@ export default function Home() {
                   <RiskChip risk={row.risk} />
                 </div>
               ))}
+              {ringRows.length === 0 && <p className="py-5 text-xs text-slate-500">No flagged clusters are available.</p>}
             </div>
           </div>
         </section>
@@ -511,7 +476,7 @@ export default function Home() {
               <p>Person -[PAID_BY]- Payment</p>
             </div>
             <p className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-[11px] leading-relaxed text-amber-100/80">
-              Use a dedicated test wallet and Monero test/stagenet configuration for demos. The
+              Use a dedicated receiving wallet and Monero test/stagenet configuration for testing. The
               wallet-RPC service controls the receiving wallet; never expose it publicly or use a
               main wallet seed.
             </p>

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { keccak256, stringToHex } from "viem";
 import { useAccount } from "wagmi";
-import { AuthSession, getAuthToken, getDemoSession } from "@/lib/auth";
+import { getAuthToken } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 
@@ -24,15 +24,6 @@ export function CakePayment() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [demoSession, setDemoSession] = useState<AuthSession | null>(null);
-  const [demoPayment, setDemoPayment] = useState<{ id: string; status: "pending" | "confirmed" } | null>(null);
-
-  useEffect(() => {
-    const refresh = () => setDemoSession(getDemoSession());
-    refresh();
-    window.addEventListener("trustgraph-auth", refresh);
-    return () => window.removeEventListener("trustgraph-auth", refresh);
-  }, []);
 
   async function createIntent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,20 +67,6 @@ export function CakePayment() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not check payment status.");
     }
-  }
-
-  if (demoSession) {
-    return <div className="panel rounded-3xl border border-sky-400/20 p-6">
-      <p className="text-[10px] uppercase tracking-[0.24em] text-sky-300/80">demo payment · no wallet needed</p>
-      <h2 className="mt-2 text-xl font-semibold text-white">Simulate a donor transaction</h2>
-      <p className="mt-2 text-xs leading-relaxed text-slate-400">This is a local preview only. It does not create a Monero invoice, contact the API, generate a QR code, or send crypto.</p>
-      {demoSession.role !== "donor" ? <p className="mt-5 rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-xs text-slate-300">Sign in with the demo Donor account to try the simulated payment flow.</p> : demoPayment ? <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-        <p className="font-mono text-xs text-slate-300">{demoPayment.id}</p>
-        <p className="mt-2 text-sm text-white">0.01 XMR <span className="text-xs text-slate-500">(demo amount only)</span></p>
-        <p className={`mt-2 text-xs ${demoPayment.status === "confirmed" ? "text-emerald-300" : "text-amber-200"}`}>Status: {demoPayment.status} · simulated</p>
-        <div className="mt-4 flex flex-wrap gap-2">{demoPayment.status === "pending" && <button onClick={() => setDemoPayment({ ...demoPayment, status: "confirmed" })} className="rounded-full bg-sky-300 px-4 py-2 text-xs font-semibold text-slate-950">Mark simulated payment as paid</button>}<button onClick={() => setDemoPayment(null)} className="rounded-full border border-slate-600 px-4 py-2 text-xs text-slate-200">Start over</button></div>
-      </div> : <button onClick={() => setDemoPayment({ id: `demo-tx-${Date.now().toString(36)}`, status: "pending" })} className="mt-5 rounded-full bg-sky-300 px-4 py-2 text-xs font-semibold text-slate-950">Create simulated transaction</button>}
-    </div>;
   }
 
   return (

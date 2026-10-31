@@ -1,4 +1,4 @@
-"""Seed the TrustGraph demo dataset.
+"""Load sample TrustGraph records for development and query evaluation.
 
 Creates 60 people, 3 issuers, credentials, vouches, devices, challenges, payments,
 and two planted sybil rings so the detection query has something to find.

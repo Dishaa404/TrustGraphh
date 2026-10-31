@@ -12,7 +12,7 @@ Proof of Humanity / BrightID-style personhood verification.
 apps/web      Next.js frontend + verifier portal
 apps/api      FastAPI backend, TigerGraph client, Cake Wallet XMR adapter
 contracts     Solidity registry contracts (Hardhat)
-graph         TigerGraph schema, GSQL queries, seed data
+graph         TigerGraph schema, GSQL queries, sample data loader
 docs          Hackathon deployment guide
 ```
 
@@ -32,11 +32,6 @@ transaction. Donor and receiver roles are self-selected. NGO issuer access requi
 listed in the API's `VERIFIED_NGO_WALLETS` setting; other NGO wallets can submit an application and
 remain pending. Local development can use in-memory storage; production/Vercel deployments require
 `DATABASE_URL` pointing to PostgreSQL for sessions and API records.
-
-To preview without a crypto wallet, enable `NEXT_PUBLIC_DEMO_MODE=true` and use **Try demo Donor/Receiver/NGO** on the landing page. Demo
-sessions are browser-only and the Cake payment panel creates a simulated transaction that can be
-marked paid locally. Demo actions do not authenticate with the API, submit blockchain transactions,
-create an XMR invoice, or transfer funds.
 
 ## Quickstart
 
@@ -76,22 +71,22 @@ npm run dev
 
 ### TigerGraph
 
-Follow `graph/README.md` to create the `TrustGraph` graph, install the queries, and seed
-synthetic humans (including planted sybil rings) with `graph/seed.py`.
+Follow `graph/README.md` to create the `TrustGraph` graph, install the queries, and load sample
+records for development with `graph/seed.py`.
 
 ## Core model
 
-- **Person** registers with a DID hash and a random demo commitment, backed by a stake. The current flow does not collect or verify biometrics.
+- **Person** registers with a DID hash and a random commitment, backed by a stake. The current flow does not collect or verify biometrics.
 - **Vouches** are signed on-chain by already-active humans; activation needs `requiredVouches`.
-- **TigerGraph** turns seeded and indexed Base Sepolia registry data into explainable trust scores and Sybil-ring signals.
+- **TigerGraph** turns indexed Base Sepolia registry data into explainable trust scores and Sybil-ring signals.
 - **Credentials** can be hashed and anchored on-chain; encrypted IPFS storage is not implemented yet.
 - **Challenges** are stake-backed and resolved by an arbitrator; upheld challenges slash the
   registration stake and revoke the member.
 
 The current web registration action writes a random commitment hash to the contract. It is not a
-biometric check, uniqueness proof, or Semaphore proof. TigerGraph returns clearly labelled demo data
-when not configured. Cake Wallet payments require a real merchant Monero wallet RPC and XMR; they
-are not simulated. Do not treat this prototype as real-world identity verification.
+biometric check, uniqueness proof, or Semaphore proof. Graph data is unavailable until TigerGraph is
+configured. Cake Wallet payments require a real merchant Monero wallet RPC and XMR. Do not treat this
+service as real-world identity verification.
 
 ## Environment
 

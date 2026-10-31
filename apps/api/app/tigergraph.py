@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime
 from threading import Lock
 from typing import Any
@@ -9,11 +8,7 @@ from app.config import Settings, get_settings
 
 
 class GraphClient:
-    """Thin wrapper around pyTigerGraph with a deterministic demo fallback.
-
-    The fallback keeps the API and frontend usable before a Savanna instance is
-    connected. It is clearly labelled with source="demo".
-    """
+    """TigerGraph queries and writes for trust records."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -58,16 +53,9 @@ class GraphClient:
 
     def trust_score(self, did: str) -> dict[str, Any]:
         if not self.configured:
-            seed = int(hashlib.sha256(did.encode()).hexdigest()[:8], 16)
             return {
                 "did": did,
-                "trust_score": float(40 + seed % 45),
-                "vouch_score": 0.0,
-                "vouch_count": 0,
-                "credential_score": 0.0,
-                "challenge_penalty": 0,
-                "device_penalty": 0,
-                "source": "demo",
+                "source": "unconfigured",
             }
 
         rows = self._run("trust_score", {"did": did})
@@ -83,7 +71,7 @@ class GraphClient:
                 "credentials": [],
                 "devices": [],
                 "upheld_challenges": [],
-                "source": "demo",
+                "source": "unconfigured",
             }
 
         rows = self._run("explain_trust", {"did": did})
@@ -92,7 +80,7 @@ class GraphClient:
 
     def sybil_rings(self, min_mutual: int = 2, min_devices: int = 2) -> dict[str, Any]:
         if not self.configured:
-            return {"flagged": [], "source": "demo"}
+            return {"flagged": [], "source": "unconfigured"}
 
         rows = self._run(
             "sybil_rings",
@@ -208,7 +196,7 @@ class GraphClient:
 
     def service_status(self) -> str:
         if not self.configured:
-            return "demo"
+            return "unconfigured"
         try:
             self._conn().getInstalledQueries()
         except Exception:  # noqa: BLE001

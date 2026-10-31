@@ -185,7 +185,7 @@ export function RegistryActions() {
         <h3 className="font-semibold text-white">Register on Base Sepolia</h3>
         <p className="mt-2 text-xs leading-relaxed text-slate-400">
           Registration stakes {stake === undefined ? "…" : `${formatEther(stake)} ETH`} and records a
-          random commitment hash. It is a hackathon demo commitment, not biometric verification.
+          random commitment hash. It is not biometric identity verification.
         </p>
         {didHash && <p className="mt-3 break-all font-mono text-[10px] text-slate-500">DID hash: {didHash}</p>}
         {!isConnected ? (
@@ -214,7 +214,7 @@ export function RegistryActions() {
           <h3 className="font-semibold text-white">Owner setup for a fresh registry</h3>
           <p className="mt-2 text-xs leading-relaxed text-slate-400">
             This registry starts with no active people, so nobody can vouch yet. The owner can
-            temporarily set the threshold to zero, register three demo wallets, then restore the
+            temporarily set the threshold to zero, register three wallets, then restore the
             threshold to three before inviting anyone else.
           </p>
           <p className="mt-2 text-xs text-slate-400">Current required vouches: {requiredVouches?.toString() ?? "…"}</p>

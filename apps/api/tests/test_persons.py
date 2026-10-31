@@ -51,22 +51,22 @@ def test_api_does_not_forge_vouches_off_chain(client):
     assert "Base Sepolia registry" in response.json()["detail"]
 
 
-def test_trust_score_has_demo_fallback(client):
+def test_trust_score_reports_unconfigured_graph(client):
     person = create_person(client, "0xtrust")
 
     response = client.get(f"/persons/{person['did']}/trust")
 
     assert response.status_code == 200
     body = response.json()
-    assert 0 <= body["trust_score"] <= 100
-    assert body["source"] == "demo"
+    assert body["source"] == "unconfigured"
 
 
-def test_graph_endpoints_in_demo_mode(client):
+def test_graph_endpoints_report_unconfigured(client):
     rings = client.get("/graph/rings")
-    explain = client.get("/graph/explain/did:trustgraph:person-001")
+    explain = client.get("/graph/explain/did:trustgraph:unindexed-person")
 
     assert rings.status_code == 200
     assert rings.json()["flagged"] == []
+    assert rings.json()["source"] == "unconfigured"
     assert explain.status_code == 200
-    assert explain.json()["source"] == "demo"
+    assert explain.json()["source"] == "unconfigured"

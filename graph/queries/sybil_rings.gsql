@@ -1,4 +1,4 @@
-// Heuristic sybil-ring detector for the demo.
+// Heuristic sybil-ring detector.
 // Flags accounts that participate in mutual vouching cycles and/or share devices
 // with unrelated accounts. For production, install the TigerGraph GDS Louvain
 // community query and use community density / external-edge ratio instead.

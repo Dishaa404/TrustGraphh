@@ -1,6 +1,6 @@
 # TigerGraph layer
 
-Schema, GSQL queries, and demo seed data for TrustGraph.
+Schema, GSQL queries, and sample seed data for TrustGraph development.
 
 ## Setup
 
@@ -13,11 +13,13 @@ pip install -r requirements.txt
 python install.py
 ```
 
-4. Load the demo dataset (60 people, 2 planted sybil rings):
+4. Load the sample dataset (synthetic people and sybil rings):
 
 ```bash
 python seed.py
 ```
+
+The seed loader is for local development and query evaluation. Do not run it against a live production graph.
 
 The API uses the same `TG_HOST`, `TG_GRAPH`, and `TG_SECRET` values in `apps/api/.env`.
 The client uses the TigerGraph Cloud graph-secret flow, then runs installed queries and
@@ -34,7 +36,7 @@ upserts person, vouch, and confirmed payment records. Do not put the graph secre
 Run them through the API after installing the queries, or directly from Python:
 
 ```bash
-python -c "import seed; c = seed.connect(); print(c.runInstalledQuery('trust_score', {'did': 'did:trustgraph:person-001'}))"
+python -c "import seed; c = seed.connect(); print(c.runInstalledQuery('trust_score', {'did': 'did:trustgraph:<registered-did>'}))"
 ```
 
 ## Production hardening

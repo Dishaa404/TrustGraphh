@@ -1,6 +1,6 @@
 # Base Sepolia hackathon deployment
 
-This deploys the Solidity registries to Base Sepolia and runs the web/API demo locally. TigerGraph handles graph queries and indexed registry events. Cake Wallet is the payer app for XMR; the API creates invoice subaddresses through an authenticated merchant Monero wallet-RPC service. Semaphore proofs are not implemented. Registration stores a random commitment hash; it is not biometric or proof-of-personhood verification.
+This deploys the Solidity registries to Base Sepolia and runs the web/API locally. TigerGraph handles graph queries and indexed registry events. Cake Wallet is the payer app for XMR; the API creates invoice subaddresses through an authenticated merchant wallet-RPC service. Semaphore proofs are not implemented. Registration stores a random commitment hash; it is not biometric or proof-of-personhood verification.
 
 ## 1. Configure and deploy contracts
 
@@ -22,7 +22,7 @@ npm run deploy:baseSepolia
 
 The deployment command refuses a non-Base-Sepolia chain and prints both contract addresses. Save the `PersonhoodRegistry` address.
 
-The registry starts with three required vouches but no active members. In the web app, connect the deployer/owner wallet and temporarily select **Enable initial registrations (0)**. Register three distinct demo wallets, then reconnect the owner and select **Restore 3-vouch rule**. New registrations can then be activated by those members' on-chain vouches.
+The registry starts with three required vouches but no active members. In the web app, connect the deployer/owner wallet and temporarily select **Enable initial registrations (0)**. Register three distinct wallets, then reconnect the owner and select **Restore 3-vouch rule**. New registrations can then be activated by those members' on-chain vouches.
 
 ## 2. Configure TigerGraph
 
@@ -33,10 +33,9 @@ cd graph
 cp .env.example .env
 python -m pip install -r requirements.txt
 python install.py
-python seed.py
 ```
 
-Use `TG_GRAPH=TrustGraph`. The seed script loads 60 demo people and two planted sybil rings. Copy the same `TG_HOST`, `TG_GRAPH`, and `TG_SECRET` values into the API environment. The API uses TigerGraph for trust, explanation, and sybil queries, and writes indexed Base Sepolia people/vouches and XMR payment events into the graph. Keep the graph secret server-side; it does not belong in the web app.
+Use `TG_GRAPH=TrustGraph`. Copy the same `TG_HOST`, `TG_GRAPH`, and `TG_SECRET` values into the API environment. The API uses TigerGraph for trust, explanation, and sybil queries, and writes indexed Base Sepolia people/vouches and XMR payment events into the graph. Keep the graph secret server-side; it does not belong in the web app. `graph/seed.py` is for local query development only; do not run it against the live graph.
 
 ## 3. Configure Cake Wallet XMR payments
 
@@ -70,7 +69,7 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Without TigerGraph credentials, graph endpoints return labelled demo responses. Local development uses in-memory storage when `DATABASE_URL` is unset. Vercel/production requires a PostgreSQL `DATABASE_URL`; it stores sessions, login challenges, people, credentials, payment intents, and NGO applications across function instances.
+Without TigerGraph credentials, graph endpoints report that the service is unconfigured. Local development uses in-memory storage when `DATABASE_URL` is unset. Vercel/production requires a PostgreSQL `DATABASE_URL`; it stores sessions, login challenges, people, credentials, payment intents, and NGO applications across function instances.
 
 ### Role sign-in and NGO approval
 
@@ -93,7 +92,6 @@ npm run dev
 
 Open `http://localhost:3000`, connect an injected wallet, switch it to Base Sepolia, and register. The page reads the registration stake from the contract and links submitted transactions to BaseScan. It also creates Cake Wallet invoices through the API and shows the returned payment QR code.
 
-For a no-wallet preview, choose **Try demo Donor**, **Try demo Receiver**, or **Try demo NGO** on the landing page. The donor demo can create a simulated payment and mark it paid. This is browser-only preview state; it does not call the API, create a Monero invoice, or submit a blockchain transaction.
 
 ## 6. Deploy a live MVP to Vercel
 
@@ -104,9 +102,9 @@ in-memory store or a local SQLite file for Vercel functions. Import this reposit
    frontend's production origin, `BASE_SEPOLIA_RPC_URL`, `PERSONHOOD_REGISTRY_ADDRESS`, and
    server-only `TG_HOST`, `TG_GRAPH`, `TG_SECRET`, and `VERIFIED_NGO_WALLETS`. Add the Cake wallet-RPC variables only when you have a secured, remotely
    reachable Monero wallet RPC service; `127.0.0.1` will refer to the Vercel function itself.
-2. Web project root: `apps/web`. Set `NEXT_PUBLIC_API_URL` to the deployed API origin,
-   `NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS` to the deployed registry address, and
-   `NEXT_PUBLIC_DEMO_MODE=false` for the live site. Do not set a GitHub Pages base path.
+2. Web project root: `apps/web`. Set `NEXT_PUBLIC_API_URL` to the deployed API origin and
+   `NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS` to the deployed registry address. Leave
+   `NEXT_PUBLIC_BASE_PATH` empty or unset for the Vercel domain.
 3. Redeploy both projects after configuring variables. Check API `/health`, then the site should
    report the API and TigerGraph as connected when both are reachable and the graph queries are
    installed.
@@ -114,10 +112,6 @@ in-memory store or a local SQLite file for Vercel functions. Import this reposit
 After a receiver transaction confirms, the web app asks the API to verify its receipt against the
 configured Base Sepolia registry. Verified `Registered`, `Vouched`, `Activated`, `Challenged`,
 `ChallengeResolved`, and `Revoked` events are then written to the API store and TigerGraph.
-
-For a review environment that needs wallet-free preview accounts, set `NEXT_PUBLIC_DEMO_MODE=true`
-on that Vercel preview only. Keep it disabled on the live site. Demo users do not create API sessions
-or real transactions.
 
 The API creates the small `trustgraph_store` JSONB table on first start. The database URL must point
 to PostgreSQL and allow TLS from Vercel where required by the provider. Local in-memory mode is for
