@@ -66,6 +66,8 @@ def get_person(did: str) -> dict:
 
 @router.get("/{did}/trust")
 def get_trust(did: str) -> dict:
+    if not graph_client.configured:
+        raise HTTPException(status_code=503, detail="TigerGraph is not configured")
     return graph_client.trust_score(did)
 
 

@@ -171,12 +171,7 @@ export function RegistryActions() {
   }
 
   if (!registryAddress || !isAddress(registryAddress)) {
-    return (
-      <div className="panel rounded-2xl p-5 text-sm text-slate-300">
-        Deploy the registry, then set <code>NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS</code> in
-        <code> apps/web/.env.local</code> to enable on-chain registration.
-      </div>
-    );
+    return null;
   }
 
   return (

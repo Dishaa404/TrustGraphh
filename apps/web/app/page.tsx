@@ -462,25 +462,6 @@ export default function Home() {
 
         <section id="payments" className="mt-20 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
           <CakePayment />
-          <div className="panel rounded-3xl p-6">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">payment flow</p>
-            <h2 className="mt-2 text-xl font-semibold text-white">Cake Wallet to TigerGraph</h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-400">
-              Cake Wallet scans the Monero URI. The merchant wallet RPC creates an invoice-specific
-              subaddress and checks incoming transfers. The API can then record the payment event in
-              TigerGraph for graph analysis.
-            </p>
-            <div className="mt-5 space-y-2 font-mono text-[11px] text-slate-500">
-              <p>POST /payments/intent → create_address + make_uri</p>
-              <p>GET /payments/:id → get_transfers</p>
-              <p>Person -[PAID_BY]- Payment</p>
-            </div>
-            <p className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-[11px] leading-relaxed text-amber-100/80">
-              Use a dedicated receiving wallet and Monero test/stagenet configuration for testing. The
-              wallet-RPC service controls the receiving wallet; never expose it publicly or use a
-              main wallet seed.
-            </p>
-          </div>
         </section>
 
         <footer className="mt-20 flex flex-col items-start justify-between gap-4 border-t border-slate-800/80 pt-6 text-xs text-slate-500 md:flex-row md:items-center">

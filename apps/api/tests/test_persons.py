@@ -51,22 +51,20 @@ def test_api_does_not_forge_vouches_off_chain(client):
     assert "Base Sepolia registry" in response.json()["detail"]
 
 
-def test_trust_score_reports_unconfigured_graph(client):
+def test_trust_score_requires_configured_graph(client):
     person = create_person(client, "0xtrust")
 
     response = client.get(f"/persons/{person['did']}/trust")
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "unconfigured"
+    assert response.status_code == 503
+    assert response.json()["detail"] == "TigerGraph is not configured"
 
 
-def test_graph_endpoints_report_unconfigured(client):
+def test_graph_endpoints_require_configured_graph(client):
     rings = client.get("/graph/rings")
     explain = client.get("/graph/explain/did:trustgraph:unindexed-person")
 
-    assert rings.status_code == 200
-    assert rings.json()["flagged"] == []
-    assert rings.json()["source"] == "unconfigured"
-    assert explain.status_code == 200
-    assert explain.json()["source"] == "unconfigured"
+    assert rings.status_code == 503
+    assert rings.json()["detail"] == "TigerGraph is not configured"
+    assert explain.status_code == 503
+    assert explain.json()["detail"] == "TigerGraph is not configured"

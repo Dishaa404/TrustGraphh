@@ -52,36 +52,17 @@ class GraphClient:
         return normalized
 
     def trust_score(self, did: str) -> dict[str, Any]:
-        if not self.configured:
-            return {
-                "did": did,
-                "source": "unconfigured",
-            }
-
         rows = self._run("trust_score", {"did": did})
         if not rows:
             return {"did": did, "trust_score": 0.0, "source": "tigergraph"}
         return {"did": did, **rows[0], "source": "tigergraph"}
 
     def explain_trust(self, did: str) -> dict[str, Any]:
-        if not self.configured:
-            return {
-                "did": did,
-                "vouchers": [],
-                "credentials": [],
-                "devices": [],
-                "upheld_challenges": [],
-                "source": "unconfigured",
-            }
-
         rows = self._run("explain_trust", {"did": did})
         payload = rows[0] if rows else {}
         return {"did": did, **payload, "source": "tigergraph"}
 
     def sybil_rings(self, min_mutual: int = 2, min_devices: int = 2) -> dict[str, Any]:
-        if not self.configured:
-            return {"flagged": [], "source": "unconfigured"}
-
         rows = self._run(
             "sybil_rings",
             {"min_mutual": min_mutual, "min_devices": min_devices},
