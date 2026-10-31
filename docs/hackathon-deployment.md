@@ -90,7 +90,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`, connect an injected wallet, switch it to Base Sepolia, and register. The page reads the registration stake from the contract and links submitted transactions to BaseScan. It also creates Cake Wallet invoices through the API and shows the returned payment QR code.
+Open `http://localhost:3000`, connect an injected EVM wallet or choose **Connect Cake Wallet (QR)**, switch it to Base Sepolia, and register. WalletConnect QR connection requires a WalletConnect project ID from WalletConnect Cloud. Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` in `apps/web/.env.local` before starting the web app. Cake Wallet must have an Ethereum-compatible wallet selected and Base Sepolia test ETH to submit registry transactions. The page reads the registration stake from the contract and links submitted transactions to BaseScan. Cake Wallet XMR invoices are a separate payment flow through the API.
 
 
 ## 6. Deploy a live MVP to Vercel
@@ -102,8 +102,10 @@ in-memory store or a local SQLite file for Vercel functions. Import this reposit
    frontend's production origin, `BASE_SEPOLIA_RPC_URL`, `PERSONHOOD_REGISTRY_ADDRESS`, and
    server-only `TG_HOST`, `TG_GRAPH`, `TG_SECRET`, and `VERIFIED_NGO_WALLETS`. Add the Cake wallet-RPC variables only when you have a secured, remotely
    reachable Monero wallet RPC service; `127.0.0.1` will refer to the Vercel function itself.
-2. Web project root: `apps/web`. Set `NEXT_PUBLIC_API_URL` to the deployed API origin and
-   `NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS` to the deployed registry address. Leave
+2. Web project root: `apps/web`. Set `NEXT_PUBLIC_API_URL` to the deployed API origin,
+   `NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS` to the deployed registry address, and
+   `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` to a WalletConnect Cloud project ID if connecting Cake Wallet
+   by QR. Leave
    `NEXT_PUBLIC_BASE_PATH` empty or unset for the Vercel domain.
 3. Redeploy both projects after configuring variables. Check API `/health`, then the site should
    report the API and TigerGraph as connected when both are reachable and the graph queries are
