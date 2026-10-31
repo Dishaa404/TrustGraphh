@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import time
+from hashlib import sha256
 from typing import Any, Literal
 
 from eth_account import Account
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 UserRole = Literal["donor", "receiver", "ngo"]
 SESSION_TTL_SECONDS = 12 * 60 * 60
+NONCE_TTL_SECONDS = 5 * 60
 
 
 class NonceRequest(BaseModel):
@@ -50,9 +52,10 @@ def get_current_session(authorization: str | None = Header(default=None)) -> dic
 
     token = authorization[7:].strip()
     with store.lock:
-        session = store.sessions.get(token)
+        token_hash = sha256(token.encode()).hexdigest()
+        session = store.sessions.get(token_hash)
         if session and float(session.get("expires_at", 0)) <= time.time():
-            store.sessions.pop(token, None)
+            store.sessions.pop(token_hash, None)
             session = None
         if session:
             return {**session, "token": token}
@@ -76,7 +79,7 @@ def create_nonce(payload: NonceRequest) -> dict[str, str]:
     wallet = payload.wallet.lower()
     nonce = secrets.token_hex(16)
     with store.lock:
-        store.nonces[wallet] = {"nonce": nonce, "role": payload.role}
+        store.nonces[wallet] = {"nonce": nonce, "role": payload.role, "expires_at": time.time() + NONCE_TTL_SECONDS}
 
     return {
         "wallet": wallet,
@@ -96,6 +99,7 @@ def verify(payload: VerifyRequest) -> dict[str, Any]:
     if (
         not expected
         or expected.get("role") != payload.role
+        or float(expected.get("expires_at", 0)) <= time.time()
         or not secrets.compare_digest(expected.get("nonce", ""), payload.nonce)
     ):
         raise HTTPException(status_code=400, detail="Unknown, expired, or mismatched login challenge")
@@ -111,6 +115,10 @@ def verify(payload: VerifyRequest) -> dict[str, Any]:
     if recovered.lower() != wallet:
         raise HTTPException(status_code=401, detail="Signature does not match wallet")
 
+    with store.lock:
+        if not store.nonces.consume_nonce(wallet, payload.nonce, payload.role):
+            raise HTTPException(status_code=400, detail="Login challenge has expired or was already used")
+
     settings = get_settings()
     approval_status = (
         "approved" if wallet in settings.ngo_wallet_allowlist else "pending"
@@ -124,9 +132,7 @@ def verify(payload: VerifyRequest) -> dict[str, Any]:
         "expires_at": now + SESSION_TTL_SECONDS,
     }
     token = secrets.token_urlsafe(32)
-    with store.lock:
-        store.nonces.pop(wallet, None)
-        store.sessions[token] = session_data
+    store.sessions[sha256(token.encode()).hexdigest()] = session_data
 
     return {"authenticated": True, "address": recovered, "token": token, **session_data}
 
@@ -145,7 +151,7 @@ def logout(
 ) -> dict[str, bool]:
     token = authorization[7:].strip() if authorization else ""
     with store.lock:
-        store.sessions.pop(token, None)
+        store.sessions.pop(sha256(token.encode()).hexdigest(), None)
     return {"authenticated": False}
 
 

@@ -16,7 +16,8 @@ def health() -> dict:
         "environment": settings.app_env,
         "services": {
             "tigergraph": graph_client.service_status(),
-            "payments": "connected" if settings.cake_wallet_configured else "unconfigured",
+            "registry": "configured" if settings.registry_configured else "unconfigured",
+            "payments": "configured" if settings.cake_wallet_configured else "unconfigured",
             "payment_provider": settings.payment_provider,
         },
     }

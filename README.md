@@ -18,21 +18,22 @@ docs          Hackathon deployment guide
 
 ## Status
 
-Hackathon prototype. The contracts support stake-backed registration, vouching, challenges,
+Live MVP foundation, still not a verified-personhood production service. The contracts support stake-backed registration, vouching, challenges,
 revocation, withdrawals, and credential anchoring. The web app can submit registration and vouch
 transactions after a Base Sepolia deployment. The API connects to TigerGraph for queries and writes,
 and creates XMR invoices through an authenticated Monero wallet RPC so a payer can use Cake Wallet.
-Contract events are not yet indexed into TigerGraph. Semaphore proofs and production identity
-verification are not implemented.
+Base Sepolia registry events can be indexed into TigerGraph after the receiver signs in and the API
+validates the mined transaction receipt. Off-chain vouch writes are rejected; contract events are the
+source of truth. Semaphore proofs and independent real-world identity verification are not implemented.
 
 Wallet sign-in supports donor, receiver, and NGO roles. The backend issues short-lived bearer
 sessions after an Ethereum wallet signature; the signature is only a login proof and does not send a
 transaction. Donor and receiver roles are self-selected. NGO issuer access requires the wallet to be
 listed in the API's `VERIFIED_NGO_WALLETS` setting; other NGO wallets can submit an application and
-remain pending. API sessions and application records currently use in-memory storage and reset when
-the API restarts.
+remain pending. Local development can use in-memory storage; production/Vercel deployments require
+`DATABASE_URL` pointing to PostgreSQL for sessions and API records.
 
-To preview without a crypto wallet, use **Try demo Donor/Receiver/NGO** on the landing page. Demo
+To preview without a crypto wallet, enable `NEXT_PUBLIC_DEMO_MODE=true` and use **Try demo Donor/Receiver/NGO** on the landing page. Demo
 sessions are browser-only and the Cake payment panel creates a simulated transaction that can be
 marked paid locally. Demo actions do not authenticate with the API, submit blockchain transactions,
 create an XMR invoice, or transfer funds.
@@ -82,7 +83,7 @@ synthetic humans (including planted sybil rings) with `graph/seed.py`.
 
 - **Person** registers with a DID hash and a random demo commitment, backed by a stake. The current flow does not collect or verify biometrics.
 - **Vouches** are signed on-chain by already-active humans; activation needs `requiredVouches`.
-- **TigerGraph** turns API and seeded vouch data into an explainable trust score and flags likely sybil rings.
+- **TigerGraph** turns seeded and indexed Base Sepolia registry data into explainable trust scores and Sybil-ring signals.
 - **Credentials** can be hashed and anchored on-chain; encrypted IPFS storage is not implemented yet.
 - **Challenges** are stake-backed and resolved by an arbitrator; upheld challenges slash the
   registration stake and revoke the member.

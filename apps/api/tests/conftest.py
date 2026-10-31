@@ -14,8 +14,10 @@ for key in [
     "RODO_API_KEY",
     "RODO_WEBHOOK_SECRET",
     "CAKE_MONERO_WALLET_RPC_URL",
+    "DATABASE_URL",
 ]:
     os.environ[key] = ""
+os.environ["APP_ENV"] = "development"
 
 from app.main import app  # noqa: E402
 from app.store import store  # noqa: E402

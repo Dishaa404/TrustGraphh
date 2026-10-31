@@ -8,6 +8,7 @@ export type AuthSession = {
 };
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
+export const DEMO_MODE_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || process.env.NODE_ENV === "development";
 const TOKEN_KEY = "trustgraph.session";
 const DEMO_SESSION_KEY = "trustgraph.demo-session";
 
@@ -25,6 +26,10 @@ export function clearAuthToken() {
 
 export function getDemoSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
+  if (!DEMO_MODE_ENABLED) {
+    window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+    return null;
+  }
   const value = window.sessionStorage.getItem(DEMO_SESSION_KEY);
   if (!value) return null;
   try { return JSON.parse(value) as AuthSession; } catch { return null; }

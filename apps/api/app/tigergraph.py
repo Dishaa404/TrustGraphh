@@ -104,17 +104,54 @@ class GraphClient:
     def upsert_person(self, person: dict[str, Any]) -> None:
         if not self.configured:
             return
-        self._conn().upsertVertex(
+        connection = self._conn()
+        did = person["did"]
+        wallet = person.get("wallet") or ""
+        connection.upsertVertex(
             "Person",
-            person["did"],
+            did,
             {
-                "wallet": person["wallet"],
+                "wallet": wallet,
                 "status": person.get("status", "pending"),
                 "country_hash": person.get("country_hash", ""),
                 "biometric_hash": person.get("biometric_hash", ""),
+                "registered_at": _graph_datetime(person.get("registered_at") or person.get("created_at")),
+                "active_at": _graph_datetime(person.get("active_at")),
                 "trust_score": float(person.get("trust_score", 0.0)),
-                "source": "api",
+                "source": person.get("source", "api"),
             },
+        )
+        if wallet:
+            connection.upsertVertex("Wallet", wallet, {"chain": "base-sepolia"})
+            connection.upsertEdge("Person", did, "HAS_WALLET", "Wallet", wallet)
+
+    def upsert_credential(self, credential: dict[str, Any]) -> None:
+        if not self.configured:
+            return
+        connection = self._conn()
+        issuer = credential["issuer"].lower()
+        connection.upsertVertex(
+            "Credential",
+            credential["id"],
+            {
+                "credential_type": credential["credential_type"],
+                "content_hash": credential["content_hash"],
+                "cid": credential["cid"],
+                "status": credential["status"],
+                "issued_at": _graph_datetime(credential["issued_at"]),
+                "expires_at": _graph_datetime(credential.get("expires_at")),
+            },
+        )
+        connection.upsertVertex("Issuer", issuer, {"name": issuer, "trust_tier": 1})
+        connection.upsertEdge("Person", credential["subject_did"], "HOLDS", "Credential", credential["id"])
+        connection.upsertEdge("Credential", credential["id"], "ATTESTED_BY", "Issuer", issuer)
+
+    def upsert_challenge(self, source_did: str, target_did: str, outcome: str, created_at: str | None = None) -> None:
+        if not self.configured:
+            return
+        self._conn().upsertEdge(
+            "Person", source_did, "CHALLENGED", "Person", target_did,
+            {"reason": "registry challenge", "outcome": outcome, "created_at": _graph_datetime(created_at)},
         )
 
     def upsert_vouch(self, source_did: str, target_did: str, weight: float = 1.0) -> None:
@@ -153,6 +190,9 @@ class GraphClient:
                     "source": "payment",
                 },
             )
+        if wallet:
+            connection.upsertVertex("Wallet", wallet, {"chain": "base-sepolia"})
+            connection.upsertEdge("Person", payer_did, "HAS_WALLET", "Wallet", wallet)
         connection.upsertVertex(
             "Payment",
             payment["id"],
@@ -177,3 +217,9 @@ class GraphClient:
 
 
 graph_client = GraphClient()
+
+
+def _graph_datetime(value: str | None) -> str:
+    if not value:
+        return "1970-01-01 00:00:00"
+    return value.replace("T", " ").replace("Z", "")[:19]

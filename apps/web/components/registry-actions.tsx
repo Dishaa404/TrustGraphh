@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -10,6 +10,7 @@ import {
 import { baseSepolia } from "wagmi/chains";
 import { formatEther, isAddress, keccak256, stringToHex } from "viem";
 import { useSwitchChain } from "wagmi";
+import { API_URL, getAuthToken } from "@/lib/auth";
 
 const registryAddress = process.env.NEXT_PUBLIC_PERSONHOOD_REGISTRY_ADDRESS as
   | `0x${string}`
@@ -69,6 +70,8 @@ export function RegistryActions() {
   const [targetDidHash, setTargetDidHash] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [indexedHash, setIndexedHash] = useState<string | null>(null);
+  const [syncTransaction, setSyncTransaction] = useState(false);
   const { data: stake } = useReadContract({
     address: registryAddress,
     abi: registryAbi,
@@ -82,6 +85,27 @@ export function RegistryActions() {
   const { data: hash, error: writeError, isPending, writeContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
+  useEffect(() => {
+    if (!syncTransaction || !isSuccess || !hash || !API_URL || indexedHash === hash) return;
+    const token = getAuthToken();
+    if (!token) {
+      setMessage("Transaction confirmed on Base Sepolia. Sign in as receiver to sync it to the trust graph.");
+      setIndexedHash(hash);
+      return;
+    }
+    setIndexedHash(hash);
+    void fetch(`${API_URL}/chain/index/${hash}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (response) => {
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail ?? "Graph event sync failed.");
+      setMessage(`Transaction confirmed and ${body.indexed_events} registry event(s) synced to TigerGraph.`);
+    }).catch((cause) => {
+      setError(cause instanceof Error ? cause.message : "Graph event sync failed.");
+    });
+  }, [hash, indexedHash, isSuccess, syncTransaction]);
+
   const didHash = useMemo(
     () => (address ? keccak256(stringToHex(address.toLowerCase())) : undefined),
     [address],
@@ -90,6 +114,7 @@ export function RegistryActions() {
   async function register() {
     setError("");
     setMessage("");
+    setSyncTransaction(true);
     if (!registryAddress || !didHash || stake === undefined) {
       setError("Registry is not configured or the stake could not be read.");
       return;
@@ -112,6 +137,7 @@ export function RegistryActions() {
   function vouch() {
     setError("");
     setMessage("");
+    setSyncTransaction(true);
     if (!registryAddress || !/^0x[0-9a-fA-F]{64}$/.test(targetDidHash)) {
       setError("Enter a 32-byte DID hash (0x followed by 64 hex characters).");
       return;
@@ -129,6 +155,7 @@ export function RegistryActions() {
   function setVouchThreshold(value: 0 | 3) {
     setError("");
     setMessage("");
+    setSyncTransaction(false);
     if (!registryAddress || stake === undefined || challengeStake === undefined || challengeWindow === undefined) {
       setError("Could not read registry configuration.");
       return;

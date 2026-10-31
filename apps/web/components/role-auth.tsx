@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useSignMessage } from "wagmi";
-import { API_URL, AuthSession, clearAuthToken, clearDemoSession, getAuthToken, getDemoSession, saveAuthToken, saveDemoSession, UserRole } from "@/lib/auth";
+import { API_URL, AuthSession, clearAuthToken, clearDemoSession, DEMO_MODE_ENABLED, getAuthToken, getDemoSession, saveAuthToken, saveDemoSession, UserRole } from "@/lib/auth";
 
 const roles: { id: UserRole; title: string; detail: string }[] = [
   { id: "donor", title: "Donor", detail: "Create and track Cake Wallet invoices." },
@@ -123,11 +123,11 @@ export function RoleAuth() {
     </div> : <>
       <div className="mt-5 grid gap-3 md:grid-cols-3">{roles.map((item) => <button key={item.id} onClick={() => setRole(item.id)} className={`rounded-xl border p-4 text-left ${role === item.id ? "border-emerald-300/60 bg-emerald-400/10" : "border-slate-800 bg-slate-950/40"}`}><span className="text-sm font-semibold text-white">{item.title}</span><span className="mt-1 block text-xs leading-relaxed text-slate-400">{item.detail}</span></button>)}</div>
       <button disabled={!isConnected || busy || !API_URL} onClick={login} className="mt-4 rounded-full bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-emerald-950 disabled:opacity-50">{busy ? "Waiting for signature…" : !API_URL ? "API unavailable" : !isConnected ? "Connect wallet first" : `Sign in as ${role}`}</button>
-      <div className="mt-5 rounded-xl border border-sky-400/20 bg-sky-400/5 p-4">
+      {DEMO_MODE_ENABLED && <div className="mt-5 rounded-xl border border-sky-400/20 bg-sky-400/5 p-4">
         <p className="text-xs font-semibold text-sky-100">Just looking around? Use a demo account</p>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">No wallet, account creation, crypto, or signature needed. Demo actions are simulated.</p>
         <div className="mt-3 flex flex-wrap gap-2">{roles.map((item) => <button key={`demo-${item.id}`} onClick={() => enterDemo(item.id)} className="rounded-full border border-sky-300/30 px-3 py-1.5 text-xs text-sky-100">Try demo {item.title}</button>)}</div>
-      </div>
+      </div>}
     </>}
     {session?.role === "ngo" && session.approval_status === "pending" && <form onSubmit={submitNgoApplication} className="mt-5 grid gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 md:grid-cols-3"><label className="text-xs text-slate-300">Organization name<input required minLength={2} name="organization" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><label className="text-xs text-slate-300">Registration ID<input required minLength={2} name="registration" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><label className="text-xs text-slate-300">Website (optional)<input type="url" name="website" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" /></label><button className="rounded-full border border-amber-300/30 px-4 py-2 text-xs text-amber-100 md:col-span-3 md:justify-self-start">Submit NGO application</button></form>}
     {notice && <p className="mt-3 text-xs text-emerald-200">{notice}</p>}{error && <p className="mt-3 text-xs text-rose-300">{error}</p>}

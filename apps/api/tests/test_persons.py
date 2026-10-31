@@ -39,21 +39,16 @@ def test_duplicate_did_is_rejected(client):
     assert response.status_code == 409
 
 
-def test_three_vouches_activate_a_person(client):
+def test_api_does_not_forge_vouches_off_chain(client):
     target = create_person(client, "0xtarget")
-    vouchers = [create_person(client, f"0xvoucher{i}") for i in range(3)]
-
-    for voucher in vouchers:
-        _, headers = login(client, "receiver", account=voucher["_account"])
-        response = client.post(
-            f"/persons/{target['did']}/vouch",
-            json={"voucher_did": voucher["did"]}, headers=headers,
-        )
-        assert response.status_code == 201, response.text
-
-    fetched = client.get(f"/persons/{target['did']}").json()
-    assert fetched["status"] == "active"
-    assert len(fetched["vouches"]) == 3
+    voucher = create_person(client, "0xvoucher")
+    _, headers = login(client, "receiver", account=voucher["_account"])
+    response = client.post(
+        f"/persons/{target['did']}/vouch",
+        json={"voucher_did": voucher["did"]}, headers=headers,
+    )
+    assert response.status_code == 409
+    assert "Base Sepolia registry" in response.json()["detail"]
 
 
 def test_trust_score_has_demo_fallback(client):

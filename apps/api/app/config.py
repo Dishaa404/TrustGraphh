@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     tg_graph: str = "TrustGraph"
     tg_secret: str | None = None
 
+    base_sepolia_rpc_url: str = "https://sepolia.base.org"
+    personhood_registry_address: str | None = None
+
     payment_provider: str = "cake"
     cake_monero_wallet_rpc_url: str | None = None
     cake_monero_wallet_rpc_user: str | None = None
@@ -56,6 +59,10 @@ class Settings(BaseSettings):
             for wallet in self.verified_ngo_wallets.split(",")
             if wallet.strip()
         }
+
+    @property
+    def registry_configured(self) -> bool:
+        return bool(self.personhood_registry_address)
 
 
 @lru_cache

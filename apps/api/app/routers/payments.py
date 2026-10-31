@@ -84,7 +84,7 @@ def get_payment(payment_id: str, session: dict = Depends(get_current_session)) -
     except PaymentProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     with store.lock:
-        store.payments[payment_id]["status"] = payment["status"]
+        store.payments[payment_id] = payment
     graph_client.upsert_payment(payment)
     return payment
 
@@ -110,6 +110,7 @@ def webhook(payload: WebhookPayload, x_webhook_secret: str | None = Header(defau
         payment["status"] = payload.status
         if payload.tx_hash:
             payment["tx_hash"] = payload.tx_hash
+        store.payments[payload.payment_id] = payment
 
     graph_client.upsert_payment(payment)
     return payment

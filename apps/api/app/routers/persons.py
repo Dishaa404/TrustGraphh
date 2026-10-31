@@ -17,7 +17,6 @@ class PersonCreate(BaseModel):
     did: str | None = None
     country: str | None = None
     biometric_hash: str | None = None
-    status: str = "pending"
 
 
 class VouchCreate(BaseModel):
@@ -33,19 +32,17 @@ def create_person(payload: PersonCreate, session: dict = Depends(require_roles("
     country_hash = sha256(payload.country.encode()).hexdigest() if payload.country else None
 
     with store.lock:
-        if did in store.persons:
-            raise HTTPException(status_code=409, detail="Person already exists")
-
         person = {
             "did": did,
             "wallet": payload.wallet,
-            "status": payload.status,
+            "status": "pending",
             "country_hash": country_hash,
             "biometric_hash": payload.biometric_hash,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "vouches": [],
         }
-        store.persons[did] = person
+        if not store.persons.put_if_absent(did, person):
+            raise HTTPException(status_code=409, detail="Person already exists")
 
     graph_client.upsert_person(
         {
@@ -72,30 +69,13 @@ def get_trust(did: str) -> dict:
     return graph_client.trust_score(did)
 
 
-@router.post("/{did}/vouch", status_code=201)
+@router.post("/{did}/vouch", status_code=409)
 def vouch(
     did: str,
     payload: VouchCreate,
     session: dict = Depends(require_roles("receiver", "ngo")),
 ) -> dict:
-    with store.lock:
-        target = store.persons.get(did)
-        voucher = store.persons.get(payload.voucher_did)
-
-        if not target or not voucher:
-            raise HTTPException(status_code=404, detail="Person or voucher not found")
-        if voucher["wallet"].lower() != session["wallet"]:
-            raise HTTPException(status_code=403, detail="A wallet can only vouch as its own registered person")
-        if target["did"] == voucher["did"]:
-            raise HTTPException(status_code=400, detail="Cannot vouch for yourself")
-        if payload.voucher_did in target["vouches"]:
-            raise HTTPException(status_code=409, detail="Already vouched")
-
-        target["vouches"].append(payload.voucher_did)
-        if len(target["vouches"]) >= 3 and target["status"] == "pending":
-            target["status"] = "active"
-
-        result = {"target": did, "voucher": payload.voucher_did, "vouches": len(target["vouches"])}
-
-    graph_client.upsert_vouch(payload.voucher_did, did, payload.weight)
-    return result
+    raise HTTPException(
+        status_code=409,
+        detail="Vouches must be submitted to the Base Sepolia registry; the API indexes the confirmed contract event.",
+    )
